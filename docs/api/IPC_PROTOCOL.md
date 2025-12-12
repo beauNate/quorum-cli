@@ -121,7 +121,7 @@ Initialize the backend and check protocol compatibility.
     "name": "quorum-cli",
     "version": "1.0.0",
     "protocol_version": "1.0.0",
-    "providers": ["openai", "anthropic", "google", "xai"],
+    "providers": ["openai", "anthropic", "google", "xai", "ollama", "openrouter"],
     "version_warning": null
   }
 }
@@ -132,7 +132,7 @@ Initialize the backend and check protocol compatibility.
 | `name` | string | Backend name |
 | `version` | string | Backend version |
 | `protocol_version` | string | Backend protocol version |
-| `providers` | string[] | Available AI providers |
+| `providers` | string[] | Available AI providers (native: openai, anthropic, google, xai, ollama; compat: openrouter, lmstudio, llamaswap, custom) |
 | `version_warning` | string \| null | Warning if version mismatch detected |
 
 ---
@@ -159,13 +159,19 @@ Get all available models grouped by provider.
   "result": {
     "models": {
       "openai": [
-        {"id": "gpt-4o", "provider": "openai", "display_name": "GPT-4o"}
+        {"id": "gpt-5.1", "provider": "openai", "display_name": "GPT 5.1"}
       ],
       "anthropic": [
-        {"id": "claude-sonnet-4-5", "provider": "anthropic", "display_name": "Claude Sonnet"}
+        {"id": "claude-sonnet-4-5", "provider": "anthropic", "display_name": "Claude Sonnet 4.5"}
+      ],
+      "google": [
+        {"id": "gemini-2.5-pro", "provider": "google", "display_name": "Gemini 2.5 Pro"}
+      ],
+      "xai": [
+        {"id": "grok-4", "provider": "xai", "display_name": "Grok 4"}
       ]
     },
-    "validated": ["gpt-4o", "claude-sonnet-4-5"]
+    "validated": ["gpt-5.1", "claude-sonnet-4-5"]
   }
 }
 ```
@@ -196,7 +202,7 @@ Validate a model by making a test API call.
   "id": 3,
   "method": "validate_model",
   "params": {
-    "model_id": "gpt-4o"
+    "model_id": "gpt-5.1"
   }
 }
 ```
@@ -277,7 +283,7 @@ Get cached user settings.
   "jsonrpc": "2.0",
   "id": 5,
   "result": {
-    "selected_models": ["gpt-4o", "claude-sonnet-4-5"],
+    "selected_models": ["gpt-5.1", "claude-sonnet-4-5"],
     "discussion_method": "standard",
     "synthesizer_mode": "first",
     "max_turns": null
@@ -298,7 +304,7 @@ Save user settings (merges with existing).
   "id": 6,
   "method": "save_user_settings",
   "params": {
-    "selected_models": ["gpt-4o", "claude-sonnet-4-5"],
+    "selected_models": ["gpt-5.1", "claude-sonnet-4-5"],
     "discussion_method": "oxford"
   }
 }
@@ -385,7 +391,7 @@ Start a multi-agent discussion. This is a long-running operation that emits even
   "method": "run_discussion",
   "params": {
     "question": "What is the best programming language?",
-    "model_ids": ["gpt-4o", "claude-sonnet-4-5"],
+    "model_ids": ["gpt-5.1", "claude-sonnet-4-5"],
     "options": {
       "method": "standard",
       "max_turns": 6,
@@ -495,7 +501,7 @@ Get role assignments for a team debate method.
   "method": "get_role_assignments",
   "params": {
     "method": "oxford",
-    "model_ids": ["gpt-4o", "claude-sonnet-4-5", "gemini-pro", "grok-2"]
+    "model_ids": ["gpt-5.1", "claude-sonnet-4-5", "gemini-2.5-pro", "grok-4"]
   }
 }
 ```
@@ -507,8 +513,8 @@ Get role assignments for a team debate method.
   "id": 12,
   "result": {
     "assignments": {
-      "FOR": ["gpt-4o", "gemini-pro"],
-      "AGAINST": ["claude-sonnet-4-5", "grok-2"]
+      "FOR": ["gpt-5.1", "gemini-2.5-pro"],
+      "AGAINST": ["claude-sonnet-4-5", "grok-4"]
     }
   }
 }
@@ -528,7 +534,7 @@ Swap team assignments (FOR↔AGAINST).
   "method": "swap_role_assignments",
   "params": {
     "assignments": {
-      "FOR": ["gpt-4o"],
+      "FOR": ["gpt-5.1"],
       "AGAINST": ["claude-sonnet-4-5"]
     }
   }
@@ -543,7 +549,7 @@ Swap team assignments (FOR↔AGAINST).
   "result": {
     "assignments": {
       "FOR": ["claude-sonnet-4-5"],
-      "AGAINST": ["gpt-4o"]
+      "AGAINST": ["gpt-5.1"]
     }
   }
 }
@@ -573,7 +579,7 @@ Analyze a question and recommend the best discussion method.
   "jsonrpc": "2.0",
   "id": 14,
   "result": {
-    "advisor_model": "gpt-4o-mini",
+    "advisor_model": "gpt-4.1-mini",
     "recommendations": {
       "primary": {
         "method": "delphi",
@@ -688,7 +694,7 @@ Emitted when a model is generating a response.
   "jsonrpc": "2.0",
   "method": "thinking",
   "params": {
-    "model": "gpt-4o"
+    "model": "gpt-5.1"
   }
 }
 ```
@@ -704,7 +710,7 @@ Emitted for Phase 1 independent answers.
   "jsonrpc": "2.0",
   "method": "independent_answer",
   "params": {
-    "source": "gpt-4o",
+    "source": "gpt-5.1",
     "content": "I believe Python is the best..."
   }
 }
@@ -740,7 +746,7 @@ Emitted during discussion phases and team debates.
   "jsonrpc": "2.0",
   "method": "chat_message",
   "params": {
-    "source": "gpt-4o",
+    "source": "gpt-5.1",
     "content": "Building on the previous points...",
     "role": "FOR",
     "round_type": "opening",
@@ -768,7 +774,7 @@ Emitted for Phase 4 final positions.
   "jsonrpc": "2.0",
   "method": "final_position",
   "params": {
-    "source": "gemini-pro",
+    "source": "gemini-2.5-pro",
     "position": "Python is the best choice for beginners.",
     "confidence": "HIGH"
   }
@@ -795,11 +801,11 @@ Emitted for the final synthesis.
     "consensus": "YES",
     "synthesis": "All models agree that Python is best for beginners...",
     "differences": "Minor disagreements about JavaScript as an alternative...",
-    "synthesizer_model": "gpt-4o",
+    "synthesizer_model": "gpt-5.1",
     "confidence_breakdown": {
-      "gpt-4o": 90,
+      "gpt-5.1": 90,
       "claude-sonnet-4-5": 85,
-      "gemini-pro": 88
+      "gemini-2.5-pro": 88
     },
     "message_count": 12,
     "method": "standard"

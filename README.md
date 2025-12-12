@@ -82,6 +82,7 @@ XAI_MODELS=grok-4.1,grok-4
 QUORUM_ROUNDS_PER_AGENT=2        # Discussion rounds per agent (1-10, default: 2)
 QUORUM_SYNTHESIZER=first         # Who synthesizes: first, random, or rotate
 QUORUM_DEFAULT_LANGUAGE=         # Force response language (e.g., "Swedish", "English")
+# QUORUM_EXECUTION_MODE=auto     # VRAM optimization: auto, parallel, sequential
 ```
 
 You only need to configure the providers you want to use. At least one provider is required.
@@ -107,6 +108,39 @@ ollama pull llama3
 ```
 
 Models appear with `ollama:` prefix (e.g., `ollama:llama3`, `ollama:qwen3:8b`).
+
+**VRAM management:** When using multiple Ollama models, Quorum automatically runs them sequentially to prevent VRAM competition. No configuration needed - it just works. See [Execution Mode](#execution-mode-vram-optimization) for advanced options.
+
+### OpenAI-Compatible Providers
+
+Quorum supports any service that uses the OpenAI API format. This lets you use OpenRouter, LM Studio, llama-swap, vLLM, LocalAI, and other compatible servers alongside native providers.
+
+**OpenRouter** - Access 200+ models through one API:
+```bash
+OPENROUTER_API_KEY=sk-or-v1-...
+OPENROUTER_MODELS=anthropic/claude-3-opus,openai/gpt-4o,meta-llama/llama-3.1-70b
+```
+
+**LM Studio** - Local models with a GUI (no API key required):
+```bash
+LMSTUDIO_MODELS=llama-3.2-3b,deepseek-coder-v2
+# LMSTUDIO_BASE_URL=http://localhost:1234/v1  # Default
+```
+
+**llama-swap** - Hot-swap between local models:
+```bash
+LLAMASWAP_BASE_URL=http://localhost:8080/v1
+LLAMASWAP_MODELS=llama3,mistral-7b,qwen2
+```
+
+**Custom endpoint** - Any OpenAI-compatible server:
+```bash
+CUSTOM_BASE_URL=http://localhost:5000/v1
+CUSTOM_MODELS=model-name-1,model-name-2
+CUSTOM_API_KEY=your-key  # If required
+```
+
+Models from these providers appear in `/models` just like native providers. You can use them together with OpenAI, Anthropic, Google, xAI, and Ollama in the same discussion.
 
 **Configuration scenarios:**
 
@@ -588,6 +622,23 @@ QUORUM_DEFAULT_LANGUAGE=Swedish
 # Force English responses
 QUORUM_DEFAULT_LANGUAGE=English
 ```
+
+### Execution Mode (VRAM Optimization)
+
+When running multiple local Ollama models, they compete for GPU VRAM which can cause crashes or slowdowns. Quorum handles this automatically:
+
+| Mode | Behavior |
+|------|----------|
+| `auto` | **Default.** Cloud APIs run in parallel, Ollama runs sequentially |
+| `parallel` | Always run all models simultaneously (cloud-only setups) |
+| `sequential` | Always run models one at a time (safest for limited VRAM) |
+
+```bash
+# In .env (usually not needed - auto works for most users)
+QUORUM_EXECUTION_MODE=auto
+```
+
+**Note:** With `auto` mode (default), you don't need to configure anything. Quorum automatically detects Ollama models and runs them sequentially to prevent VRAM competition.
 
 ### UI Language
 

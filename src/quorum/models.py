@@ -285,6 +285,53 @@ def _create_model_client_internal(model_id: str) -> ChatClient:
             http_client=_get_http_client(),
         )
 
+    # === OpenAI-compatible providers ===
+
+    elif provider == "openrouter":
+        if not settings.has_openrouter:
+            raise ValueError(
+                "OpenRouter API key not configured. Set OPENROUTER_API_KEY in .env"
+            )
+        return OpenAIClient(
+            model=model_id,
+            api_key=settings.openrouter_api_key,
+            base_url=settings.openrouter_base_url,
+            http_client=_get_http_client(),
+        )
+
+    elif provider == "lmstudio":
+        # LM Studio doesn't require API key (local server)
+        return OpenAIClient(
+            model=model_id,
+            api_key=settings.lmstudio_api_key or "lm-studio",  # Dummy key if not set
+            base_url=settings.lmstudio_base_url,
+            http_client=_get_http_client(),
+        )
+
+    elif provider == "llamaswap":
+        if not settings.has_llamaswap:
+            raise ValueError(
+                "llama-swap not configured. Set LLAMASWAP_BASE_URL and LLAMASWAP_MODELS in .env"
+            )
+        return OpenAIClient(
+            model=model_id,
+            api_key=settings.llamaswap_api_key or "llamaswap",  # Dummy key if not set
+            base_url=settings.llamaswap_base_url,
+            http_client=_get_http_client(),
+        )
+
+    elif provider == "custom":
+        if not settings.has_custom:
+            raise ValueError(
+                "Custom endpoint not configured. Set CUSTOM_BASE_URL and CUSTOM_MODELS in .env"
+            )
+        return OpenAIClient(
+            model=model_id,
+            api_key=settings.custom_api_key or "custom",  # Dummy key if not set
+            base_url=settings.custom_base_url,
+            http_client=_get_http_client(),
+        )
+
     raise ValueError(f"Unsupported provider: {provider}")
 
 

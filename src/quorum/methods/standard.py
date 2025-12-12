@@ -176,21 +176,29 @@ class StandardMethod(BaseMethodOrchestrator):
                 await remove_from_pool(model_id)
                 return (model_id, agent_name, f"[Error: {extract_api_error(e)}]")
 
-        # Create tasks and use as_completed for streaming
-        tasks = [asyncio.create_task(get_answer(model_id)) for model_id in self.model_ids]
         results: list[tuple[str, str, str]] = []
 
-        try:
-            for future in asyncio.as_completed(tasks):
-                model_id, agent_name, content = await future
-                yield ThinkingComplete(model=model_id)
-                results.append((model_id, agent_name, content))
-        except asyncio.CancelledError:
-            # Cancel all remaining tasks to prevent orphans
-            for task in tasks:
-                if not task.done():
-                    task.cancel()
-            raise
+        # Sequential execution for local models (prevents VRAM competition)
+        if self._should_run_sequentially():
+            for model_id in self.model_ids:
+                result = await get_answer(model_id)
+                yield ThinkingComplete(model=result[0])
+                results.append(result)
+        else:
+            # Parallel execution for cloud APIs - use as_completed for streaming
+            tasks = [asyncio.create_task(get_answer(model_id)) for model_id in self.model_ids]
+
+            try:
+                for future in asyncio.as_completed(tasks):
+                    model_id, agent_name, content = await future
+                    yield ThinkingComplete(model=model_id)
+                    results.append((model_id, agent_name, content))
+            except asyncio.CancelledError:
+                # Cancel all remaining tasks to prevent orphans
+                for task in tasks:
+                    if not task.done():
+                        task.cancel()
+                raise
 
         # Yield all results after all completions
         for model_id, agent_name, content in results:
@@ -252,6 +260,15 @@ class StandardMethod(BaseMethodOrchestrator):
                     raw_content=str(e),
                 ))
 
+        # Sequential execution for local models (prevents VRAM competition)
+        if self._should_run_sequentially():
+            results = []
+            for model_id in self.model_ids:
+                result = await get_critique(model_id)
+                results.append(result)
+            return dict(results)
+
+        # Parallel execution for cloud APIs
         tasks = [get_critique(model_id) for model_id in self.model_ids]
         results = await asyncio.gather(*tasks)
         return dict(results)
@@ -359,6 +376,15 @@ class StandardMethod(BaseMethodOrchestrator):
                     raw_content=str(e),
                 )
 
+        # Sequential execution for local models (prevents VRAM competition)
+        if self._should_run_sequentially():
+            results = []
+            for model_id in self.model_ids:
+                result = await get_final_position(model_id)
+                results.append(result)
+            return results
+
+        # Parallel execution for cloud APIs
         tasks = [get_final_position(model_id) for model_id in self.model_ids]
         results = await asyncio.gather(*tasks)
         return list(results)

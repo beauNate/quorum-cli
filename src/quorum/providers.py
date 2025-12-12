@@ -12,25 +12,35 @@ def format_display_name(model_id: str) -> str:
     """Generate a friendly display name from model ID.
 
     Examples:
-        claude-opus-4-5-20251101 → Claude Opus 4.5
-        gpt-5.1-2025-11-13 → GPT 5.1
-        grok-4-1-fast-reasoning → Grok 4.1 Fast Reasoning
+        claude-3-5-sonnet-20241022 → Claude 3.5 Sonnet
+        gpt-4o → GPT 4o
+        mistral-7b → Mistral 7b
         o3-mini → o3 Mini
+        anthropic/claude-3-opus → Claude 3 Opus
+        qwen3:8b → Qwen3 8b
     """
     name = model_id
+
+    # For namespaced names (provider/model), extract the model part
+    if '/' in name:
+        name = name.split('/')[-1]
 
     # Remove date suffixes (YYYYMMDD or YYYY-MM-DD)
     name = re.sub(r'-\d{4}-\d{2}-\d{2}$', '', name)
     name = re.sub(r'-\d{8}$', '', name)
 
-    # Handle version patterns like "4-5" → "4.5" (but not "o3")
-    name = re.sub(r'(\d)-(\d)', r'\1.\2', name)
+    # Convert version patterns like "X-Y" to "X.Y" when:
+    # - Both X and Y are single digits (like 3-5 → 3.5)
+    # - NOT followed by size indicators (b, k, m) which indicate model size
+    # Examples: claude-3-5 → claude-3.5, grok-4-1 → grok-4.1
+    # But: mistral-7b stays mistral-7b, gemma-2-27b stays gemma-2-27b
+    name = re.sub(r'(\d)-(\d)(?![\d]*[bkmBKM])', r'\1.\2', name)
 
-    # Split on dashes and process
-    parts = name.split('-')
+    # Split on dashes and colons (for Ollama tags like qwen3:8b)
+    parts = re.split(r'[-:]', name)
 
     # Uppercase mappings
-    uppercase = {'gpt', 'xai', 'api'}
+    uppercase = {'gpt', 'xai', 'api', 'ai', 'llm'}
 
     result = []
     for part in parts:
@@ -65,12 +75,23 @@ def list_all_models_sync() -> dict[str, list[ModelInfo]]:
     settings = get_settings()
 
     result = {}
+    # Native providers
     for provider in ["openai", "anthropic", "google", "xai"]:
         models = settings.get_models_with_display_names(provider)
         result[provider] = [
             ModelInfo(id=model_id, provider=provider, display_name=display_name)
             for model_id, display_name in models
         ]
+
+    # OpenAI-compatible providers
+    for provider in ["openrouter", "lmstudio", "llamaswap", "custom"]:
+        models = settings.get_models_with_display_names(provider)
+        if models:  # Only include if configured
+            result[provider] = [
+                ModelInfo(id=model_id, provider=provider, display_name=display_name)
+                for model_id, display_name in models
+            ]
+
     return result
 
 
@@ -80,6 +101,9 @@ def get_provider_for_model(model_id: str) -> str | None:
     Cloud providers (OpenAI, Anthropic, Google, xAI) require models to be
     listed in their respective *_MODELS environment variables.
 
+    OpenAI-compatible providers (OpenRouter, LM Studio, llama-swap, Custom)
+    also require models to be listed in their respective *_MODELS variables.
+
     Ollama is a special case: models are auto-discovered and use prefix-based
     routing with the "ollama:" prefix.
 
@@ -87,16 +111,24 @@ def get_provider_for_model(model_id: str) -> str | None:
         model_id: The model identifier (e.g., "gpt-4.1", "claude-opus-4-5", "ollama:llama3")
 
     Returns:
-        Provider name ("openai", "anthropic", "google", "xai", "ollama")
-        or None if model not configured.
+        Provider name ("openai", "anthropic", "google", "xai", "ollama",
+        "openrouter", "lmstudio", "llamaswap", "custom") or None if not configured.
     """
     # Special case: Ollama prefix-based routing (auto-discovered models)
     if model_id.startswith("ollama:"):
         return "ollama"
 
-    # Cloud providers: lookup in .env configuration
+    # All providers: lookup in .env configuration
     settings = get_settings()
+
+    # Native providers
     for provider in ["openai", "anthropic", "google", "xai"]:
+        configured_models = settings.get_models(provider)
+        if model_id in configured_models:
+            return provider
+
+    # OpenAI-compatible providers
+    for provider in ["openrouter", "lmstudio", "llamaswap", "custom"]:
         configured_models = settings.get_models(provider)
         if model_id in configured_models:
             return provider

@@ -392,6 +392,32 @@ class BaseMethodOrchestrator(ABC):
         return str(response)
 
     # =========================================================================
+    # Execution Mode Helpers
+    # =========================================================================
+
+    def _should_run_sequentially(self) -> bool:
+        """Determine if models should run sequentially based on config and providers.
+
+        Returns True when sequential execution is preferred:
+        - execution_mode="sequential": Always sequential
+        - execution_mode="parallel": Always parallel (returns False)
+        - execution_mode="auto": Sequential if ANY model is Ollama (local)
+
+        This prevents VRAM competition when running multiple local models
+        that share the same GPU memory.
+        """
+        settings = get_settings()
+        mode = settings.execution_mode
+
+        if mode == "sequential":
+            return True
+        if mode == "parallel":
+            return False
+
+        # Auto mode: sequential if ANY model is Ollama (shares GPU VRAM)
+        return any(model_id.startswith("ollama:") for model_id in self.model_ids)
+
+    # =========================================================================
     # Parallel Phase Execution
     # =========================================================================
 
@@ -401,7 +427,11 @@ class BaseMethodOrchestrator(ABC):
         user_message: str,
         timeout: float = PHASE_TIMEOUT_SECONDS,
     ) -> dict[str, str]:
-        """Run all models in parallel and return responses.
+        """Run all models and return responses.
+
+        Execution mode is determined by _should_run_sequentially():
+        - Sequential: Run models one at a time (prevents VRAM competition)
+        - Parallel: Run all models concurrently (faster for cloud APIs)
 
         Args:
             prompt_builder: Function that takes model_id and returns system prompt.
@@ -421,6 +451,15 @@ class BaseMethodOrchestrator(ABC):
                 logger.warning("Error getting response from %s: %s", model_id, e)
                 return (agent_name, f"[Error: {extract_api_error(e)}]")
 
+        # Sequential execution for local models (prevents VRAM competition)
+        if self._should_run_sequentially():
+            results = []
+            for model_id in self.model_ids:
+                result = await get_response(model_id)
+                results.append(result)
+            return dict(results)
+
+        # Parallel execution for cloud APIs
         tasks = [get_response(model_id) for model_id in self.model_ids]
 
         try:

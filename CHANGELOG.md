@@ -7,7 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-<!-- Changes after 1.0.2 release go here -->
+<!-- Changes after 1.0.3 release go here -->
+
+---
+
+## [1.0.3] - 2025-12-12
+
+### Added
+
+- **Adaptive Execution Mode** - Smart VRAM management for local Ollama models
+  - New `QUORUM_EXECUTION_MODE` setting: `auto`, `parallel`, `sequential`
+  - `auto` (default): Cloud APIs run in parallel, Ollama runs sequentially
+  - Prevents VRAM competition when running multiple local models
+  - No configuration needed - works automatically for Ollama users
+
+- **OpenAI-Compatible Providers** - Connect to any OpenAI-format API
+  - **OpenRouter**: Access 200+ models through one API key
+  - **LM Studio**: Local models with GUI (no API key required)
+  - **llama-swap**: Hot-swap server for local models
+  - **Custom**: Generic fallback for any OpenAI-compatible endpoint
+  - Use multiple providers simultaneously (e.g., OpenRouter + llama-swap)
+  - Models appear in `/models` alongside native providers
 
 ---
 
@@ -141,7 +161,8 @@ User cache (`~/.quorum/`):
 
 ---
 
-[Unreleased]: https://github.com/Detrol/quorum-cli/compare/v1.0.2...HEAD
+[Unreleased]: https://github.com/Detrol/quorum-cli/compare/v1.0.3...HEAD
+[1.0.3]: https://github.com/Detrol/quorum-cli/compare/v1.0.2...v1.0.3
 [1.0.2]: https://github.com/Detrol/quorum-cli/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/Detrol/quorum-cli/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/Detrol/quorum-cli/releases/tag/v1.0.0

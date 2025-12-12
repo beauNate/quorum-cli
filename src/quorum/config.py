@@ -188,6 +188,34 @@ class Settings(BaseSettings):
     ollama_base_url: str = Field(default="http://localhost:11434", alias="OLLAMA_BASE_URL")
     ollama_api_key: str | None = Field(default=None, alias="OLLAMA_API_KEY")
 
+    # === OpenAI-compatible providers ===
+    # These allow connecting to services that use the OpenAI API format:
+    # OpenRouter, LM Studio, llama-swap, LocalAI, vLLM, etc.
+
+    # OpenRouter (multi-model aggregator)
+    openrouter_api_key: str | None = Field(default=None, alias="OPENROUTER_API_KEY")
+    openrouter_base_url: str = Field(
+        default="https://openrouter.ai/api/v1", alias="OPENROUTER_BASE_URL"
+    )
+    openrouter_models: str = Field(default="", alias="OPENROUTER_MODELS")
+
+    # LM Studio (local desktop app)
+    lmstudio_api_key: str | None = Field(default=None, alias="LMSTUDIO_API_KEY")
+    lmstudio_base_url: str = Field(
+        default="http://localhost:1234/v1", alias="LMSTUDIO_BASE_URL"
+    )
+    lmstudio_models: str = Field(default="", alias="LMSTUDIO_MODELS")
+
+    # llama-swap (hot-swap server for local models)
+    llamaswap_api_key: str | None = Field(default=None, alias="LLAMASWAP_API_KEY")
+    llamaswap_base_url: str | None = Field(default=None, alias="LLAMASWAP_BASE_URL")
+    llamaswap_models: str = Field(default="", alias="LLAMASWAP_MODELS")
+
+    # Custom OpenAI-compatible endpoint (generic fallback)
+    custom_api_key: str | None = Field(default=None, alias="CUSTOM_API_KEY")
+    custom_base_url: str | None = Field(default=None, alias="CUSTOM_BASE_URL")
+    custom_models: str = Field(default="", alias="CUSTOM_MODELS")
+
     # Model lists (comma-separated)
     openai_models: str = Field(default="", alias="OPENAI_MODELS")
     anthropic_models: str = Field(default="", alias="ANTHROPIC_MODELS")
@@ -203,6 +231,11 @@ class Settings(BaseSettings):
             "anthropic": self.anthropic_models,
             "google": self.google_models,
             "xai": self.xai_models,
+            # OpenAI-compatible providers
+            "openrouter": self.openrouter_models,
+            "lmstudio": self.lmstudio_models,
+            "llamaswap": self.llamaswap_models,
+            "custom": self.custom_models,
         }
 
     # Defaults
@@ -239,7 +272,27 @@ class Settings(BaseSettings):
     # Increase for slow local models (e.g., Ollama on CPU)
     model_timeout: int = Field(default=60, ge=10, le=600, alias="QUORUM_MODEL_TIMEOUT")
 
-    @field_validator("openai_api_key", "anthropic_api_key", "google_api_key", "xai_api_key", "ollama_api_key", mode="after")
+    # Execution mode for parallel phases: "auto", "parallel", "sequential"
+    # - auto (default): Run cloud APIs in parallel, local models (Ollama) sequentially
+    # - parallel: Always run all models in parallel (best for cloud-only setups)
+    # - sequential: Always run models one at a time (best for limited VRAM)
+    execution_mode: str = Field(default="auto", alias="QUORUM_EXECUTION_MODE")
+
+    @field_validator("execution_mode", mode="after")
+    @classmethod
+    def validate_execution_mode(cls, v: str) -> str:
+        """Validate execution mode value."""
+        valid_modes = {"auto", "parallel", "sequential"}
+        if v not in valid_modes:
+            raise ValueError(f"execution_mode must be one of {valid_modes}")
+        return v
+
+    @field_validator(
+        "openai_api_key", "anthropic_api_key", "google_api_key", "xai_api_key",
+        "ollama_api_key", "openrouter_api_key", "lmstudio_api_key",
+        "llamaswap_api_key", "custom_api_key",
+        mode="after"
+    )
     @classmethod
     def validate_api_key(cls, v: str | None) -> str | None:
         """Validate API key format and length.
@@ -459,9 +512,32 @@ class Settings(BaseSettings):
     def has_ollama(self) -> bool:
         return bool(self.ollama_base_url)
 
+    # OpenAI-compatible providers
+    @property
+    def has_openrouter(self) -> bool:
+        """OpenRouter is available if API key is set."""
+        return bool(self.openrouter_api_key)
+
+    @property
+    def has_lmstudio(self) -> bool:
+        """LM Studio is available if models are configured (no API key required)."""
+        return bool(self.lmstudio_models)
+
+    @property
+    def has_llamaswap(self) -> bool:
+        """llama-swap is available if base URL and models are configured."""
+        return bool(self.llamaswap_base_url and self.llamaswap_models)
+
+    @property
+    def has_custom(self) -> bool:
+        """Custom endpoint is available if base URL and models are configured."""
+        return bool(self.custom_base_url and self.custom_models)
+
     @property
     def available_providers(self) -> list[str]:
+        """List all available providers (native + OpenAI-compatible)."""
         providers = []
+        # Native providers
         if self.has_openai:
             providers.append("openai")
         if self.has_anthropic:
@@ -472,6 +548,15 @@ class Settings(BaseSettings):
             providers.append("xai")
         if self.has_ollama:
             providers.append("ollama")
+        # OpenAI-compatible providers
+        if self.has_openrouter:
+            providers.append("openrouter")
+        if self.has_lmstudio:
+            providers.append("lmstudio")
+        if self.has_llamaswap:
+            providers.append("llamaswap")
+        if self.has_custom:
+            providers.append("custom")
         return providers
 
 
