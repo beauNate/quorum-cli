@@ -552,9 +552,9 @@ export function App() {
           break;
 
         case "export": {
-          // Parse format argument: /export [md|text|pdf]
+          // Parse format argument: /export [md|text|pdf|json]
           const formatArg = parts[1]?.toLowerCase();
-          const validFormats: ExportFormat[] = ["md", "text", "pdf"];
+          const validFormats: ExportFormat[] = ["md", "text", "pdf", "json"];
 
           if (formatArg && !validFormats.includes(formatArg as ExportFormat)) {
             setExportMessage({ type: "error", text: t("app.error.exportFormat") });

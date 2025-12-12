@@ -7,7 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-<!-- Changes after 1.0.0 release go here -->
+<!-- Changes after 1.0.1 release go here -->
+
+---
+
+## [1.0.1] - 2025-12-12
+
+### Added
+
+- **JSON Export** - Structured JSON export with method-specific schemas (`/export json`)
+  - Each discussion method has its own schema (Standard, Oxford, Advocate, Socratic, Delphi, Brainstorm, Tradeoff)
+  - Synthesis/verdict/decision included in final phase messages
+  - Schema version 2.0 with full metadata
+
+### Changed
+
+- **Unified Export Architecture** - PDF and JSON now use the same method-aware parser
+  - Consistent phase structure across all export formats
+  - Removed legacy generic parser
 
 ---
 
@@ -82,7 +99,7 @@ Environment variables (`.env`):
 - `QUORUM_ROUNDS_PER_AGENT` - Discussion rounds (1-10)
 - `QUORUM_SYNTHESIZER` - Synthesizer mode (first/random/rotate)
 - `QUORUM_DEFAULT_LANGUAGE` - Force response language
-- `QUORUM_EXPORT_FORMAT` - Default export format (md/text/pdf)
+- `QUORUM_EXPORT_FORMAT` - Default export format (md/text/pdf/json)
 
 User cache (`~/.quorum/`):
 - `validated_models.json` - Cached model availability
@@ -106,5 +123,6 @@ User cache (`~/.quorum/`):
 
 ---
 
-[Unreleased]: https://github.com/Detrol/quorum-cli/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/Detrol/quorum-cli/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/Detrol/quorum-cli/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/Detrol/quorum-cli/releases/tag/v1.0.0

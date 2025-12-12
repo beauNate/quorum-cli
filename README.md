@@ -192,7 +192,7 @@ Select models (comma-separated): 1,3,4
 | `/advisor` or **Tab** | Get AI-powered method recommendation |
 | `/synthesizer` | Set synthesizer mode (first/random/rotate) |
 | `/status` | Show current settings |
-| `/export [format]` | Export discussion (md, text, pdf) |
+| `/export [format]` | Export discussion (md, text, pdf, json) |
 | `/clear` | Clear screen |
 | `/help` | Show help |
 | `/quit` or `/exit` | Exit Quorum |
@@ -613,13 +613,14 @@ Quorum supports two ways to save discussions:
 /export md       # Markdown format
 /export text     # Plain text (for social media)
 /export pdf      # PDF format
+/export json     # JSON format (for ML/RAG pipelines)
 ```
 
 Configure default export location and format:
 
 ```bash
 QUORUM_EXPORT_DIR=~/.quorum/exports   # Directory (default: home)
-QUORUM_EXPORT_FORMAT=md               # Default format: md, text, pdf
+QUORUM_EXPORT_FORMAT=md               # Default format: md, text, pdf, json
 ```
 
 | Format | Best For |
@@ -627,6 +628,7 @@ QUORUM_EXPORT_FORMAT=md               # Default format: md, text, pdf
 | `md` | GitHub, Discord, documentation |
 | `text` | Social media, plain copy-paste |
 | `pdf` | Formatted sharing, printing |
+| `json` | ML training data, RAG datasets, API integrations |
 
 **Auto-save** - All discussions are automatically saved as markdown. Configure the directory:
 

@@ -22,8 +22,10 @@ import {
   isRoleValue,
 } from "../types/protocol-values.js";
 import { getMethodTerminology, getResultLabelUppercase } from "./export/method-terminology.js";
-import { parseMarkdownLog } from "./export/parser.js";
+// Unified method-aware parser for all export formats
+import { parseMarkdownLog } from "./export/parser/index.js";
 import { PDFRenderer } from "./export/pdf-renderer.js";
+import type { BaseExportDocument } from "./export/schemas/base-schema.js";
 import { highlightCode, CODE_BACKGROUND, type HighlightToken } from "./export/syntax-highlight.js";
 import {
   parseMarkdown,
@@ -151,7 +153,7 @@ function containsMathTokens(tokens: InlineToken[]): boolean {
   return tokens.some(t => t.type === "math");
 }
 
-export type ExportFormat = "md" | "text" | "pdf";
+export type ExportFormat = "md" | "text" | "pdf" | "json";
 
 interface ExportOptions {
   question: string;
@@ -288,7 +290,7 @@ function renderMarkdownToPdf(doc: PDFKit.PDFDocument, text: string, width?: numb
       const bulletHeight = doc.heightOfString(bulletText, { width: textWidth - 15 });
       checkPageBreak(bulletHeight + 5);
 
-      doc.fontSize(10).font("DejaVu");
+      doc.fontSize(10).font("DejaVu").fillColor("#374151");
       doc.text("•  ", currentX, doc.y, { continued: true });
       // Use token-based rendering for math support
       if (containsMathTokens(line.tokens)) {
@@ -304,7 +306,7 @@ function renderMarkdownToPdf(doc: PDFKit.PDFDocument, text: string, width?: numb
       const numHeight = doc.heightOfString(numText, { width: textWidth - 20 });
       checkPageBreak(numHeight + 5);
 
-      doc.fontSize(10).font("DejaVu");
+      doc.fontSize(10).font("DejaVu").fillColor("#374151");
       doc.text(`${line.number}.  `, currentX, doc.y, { continued: true });
       // Use token-based rendering for math support
       if (containsMathTokens(line.tokens)) {
@@ -478,7 +480,7 @@ function renderMarkdownToPdf(doc: PDFKit.PDFDocument, text: string, width?: numb
       const paraHeight = doc.heightOfString(paragraphText, { width: textWidth });
       checkPageBreak(Math.min(paraHeight, 50)); // At least check before starting
 
-      doc.fontSize(10).font("DejaVu");
+      doc.fontSize(10).font("DejaVu").fillColor("#374151");
 
       // Use token-based rendering for math support
       if (containsMathTokens(line.tokens)) {
@@ -838,6 +840,16 @@ export async function exportSpecificLog(
       renderMarkdownLogToPdf(doc, markdown);
       doc.end();
     });
+  } else if (format === "json") {
+    // Parse markdown to structured data using method-aware parser
+    const { document, warnings } = parseMarkdownLog(markdown);
+
+    // Log warnings if any
+    if (warnings.length > 0) {
+      console.warn(`JSON export warnings for ${logPath}:`, warnings);
+    }
+
+    await fsPromises.writeFile(exportPath, JSON.stringify(document, null, 2), "utf-8");
   }
 
   return exportPath;
@@ -846,7 +858,7 @@ export async function exportSpecificLog(
 /**
  * Render a parsed discussion document to PDF using the PDFRenderer class.
  */
-function renderDiscussionToPdf(doc: PDFKit.PDFDocument, document: ReturnType<typeof parseMarkdownLog>): void {
+function renderDiscussionToPdf(doc: PDFKit.PDFDocument, document: BaseExportDocument): void {
   const renderer = new PDFRenderer(doc, formatModelName, renderMarkdownToPdf);
   renderer.render(document);
 }
@@ -862,8 +874,8 @@ function renderMarkdownLogToPdf(doc: PDFKit.PDFDocument, markdown: string): void
   // Strip the markdown footer before parsing (PDF adds its own footer)
   cleanedMarkdown = cleanedMarkdown.replace(/\n---\n+\*Exported from \[Quorum\][^\n]*\*?\s*$/, "");
 
-  // Parse markdown to structured document
-  const parsedDocument = parseMarkdownLog(cleanedMarkdown);
+  // Parse markdown to structured document using unified method-aware parser
+  const { document: parsedDocument } = parseMarkdownLog(cleanedMarkdown);
 
   // Render from structured document
   renderDiscussionToPdf(doc, parsedDocument);

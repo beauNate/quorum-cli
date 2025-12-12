@@ -1,12 +1,17 @@
 /**
  * PDF rendering for Quorum discussion exports.
- * Encapsulates PDF generation with clean component methods.
+ * Uses method-aware parser structure for consistent rendering.
  */
 
-import type { ParsedDiscussionDocument, ParsedPhase, ParsedMessage, ParsedSynthesis } from "./parser.js";
+import type {
+  BaseExportDocument,
+  BasePhase,
+  BaseMessage,
+  BaseSynthesis,
+  DiscussionMethod,
+} from "./schemas/base-schema.js";
 import { getMethodTerminology } from "./method-terminology.js";
 import { t } from "../../i18n/index.js";
-import { translateRole, translateConsensus, translateConfidence } from "../export.js";
 
 // PDF page configuration
 const PDF_CONFIG = {
@@ -73,13 +78,97 @@ function getRoleColor(role: string | null): string {
 }
 
 /**
+ * Translate role to localized string.
+ * Uses same keys as protocol-values.ts ROLE_KEYS.
+ */
+function translateRole(role: string): string {
+  const roleMap: Record<string, string> = {
+    FOR: t("role.for"),
+    AGAINST: t("role.against"),
+    ADVOCATE: t("role.advocate"),
+    DEFENDER: t("role.defender"),
+    QUESTIONER: t("role.questioner"),
+    RESPONDENT: t("role.respondent"),
+    PANELIST: t("role.panelist"),
+    IDEATOR: t("role.ideator"),
+    EVALUATOR: t("role.evaluator"),
+  };
+  return roleMap[role] || role;
+}
+
+/**
+ * Translate confidence level to localized string.
+ * Uses same keys as protocol-values.ts CONFIDENCE_KEYS.
+ */
+function translateConfidence(confidence: string): string {
+  const confMap: Record<string, string> = {
+    HIGH: t("msg.confidence.high"),
+    MEDIUM: t("msg.confidence.medium"),
+    LOW: t("msg.confidence.low"),
+  };
+  return confMap[confidence] || confidence;
+}
+
+/**
+ * Translate consensus/decision value to localized string.
+ * Uses same keys as protocol-values.ts CONSENSUS_KEYS.
+ * Oxford decisions use role keys for FOR/AGAINST.
+ */
+function translateConsensusValue(method: DiscussionMethod, value: string): string {
+  if (method === "oxford") {
+    // Oxford uses FOR/AGAINST which are role values
+    const map: Record<string, string> = {
+      FOR: t("role.for"),
+      AGAINST: t("role.against"),
+      PARTIAL: t("consensus.partial"),
+    };
+    return map[value] || value;
+  }
+  const map: Record<string, string> = {
+    YES: t("consensus.yes"),
+    NO: t("consensus.no"),
+    PARTIAL: t("consensus.partial"),
+  };
+  return map[value] || value;
+}
+
+/**
+ * Check if a message is a synthesis/final message type.
+ */
+function isSynthesisMessage(msg: BaseMessage): boolean {
+  const msgAny = msg as any;
+  return (
+    msgAny.type === "synthesis" ||
+    msgAny.type === "judgement" ||
+    msgAny.type === "verdict" ||
+    msgAny.type === "aggregation" ||
+    msgAny.type === "decision"
+  );
+}
+
+/**
+ * Check if a message is a critique type.
+ */
+function isCritiqueMessage(msg: BaseMessage): boolean {
+  return (msg as any).type === "critique";
+}
+
+/**
+ * Check if a message is a position type.
+ */
+function isPositionMessage(msg: BaseMessage): boolean {
+  return (msg as any).type === "position";
+}
+
+/**
  * PDF Renderer for Quorum discussion documents.
- * Breaks down rendering into logical component methods.
+ * Works with method-aware parser structure.
  */
 export class PDFRenderer {
   private doc: PDFKit.PDFDocument;
   private formatModelName: (id: string) => string;
   private renderMarkdown: (doc: PDFKit.PDFDocument, text: string, width?: number) => void;
+  private method: DiscussionMethod;
 
   constructor(
     doc: PDFKit.PDFDocument,
@@ -89,21 +178,20 @@ export class PDFRenderer {
     this.doc = doc;
     this.formatModelName = formatModelName;
     this.renderMarkdown = renderMarkdown;
+    this.method = "standard";
   }
 
   /**
    * Render a complete discussion document to PDF.
    */
-  render(document: ParsedDiscussionDocument): void {
-    const { metadata, question, phases, synthesis } = document;
+  render(document: BaseExportDocument): void {
+    const { metadata, phases, synthesis } = document;
+    this.method = metadata.method;
 
     this.renderHeader(metadata);
-    this.renderQuestion(question);
+    this.renderQuestion(metadata.question);
     this.renderDiscussionHeader();
-    this.renderPhases(phases);
-    if (synthesis) {
-      this.renderSynthesis(synthesis);
-    }
+    this.renderPhases(phases, synthesis);
     this.renderFooter();
   }
 
@@ -163,18 +251,33 @@ export class PDFRenderer {
 
   /**
    * Render all phases with their messages.
+   * The last phase contains synthesis which is rendered specially.
    */
-  private renderPhases(phases: ParsedPhase[]): void {
-    for (const phase of phases) {
-      if (phase.messages.length === 0) continue;
-      this.renderPhase(phase);
+  private renderPhases(phases: BasePhase[], synthesis: BaseSynthesis | null): void {
+    const totalPhases = phases.length;
+
+    for (let i = 0; i < phases.length; i++) {
+      const phase = phases[i];
+      const isLastPhase = i === totalPhases - 1;
+
+      // Check if this phase contains only synthesis messages
+      const hasSynthesisOnly = phase.messages.length > 0 &&
+        phase.messages.every(msg => isSynthesisMessage(msg));
+
+      if (isLastPhase && hasSynthesisOnly && synthesis) {
+        // Render synthesis phase with special styling
+        this.renderSynthesisPhase(phase, synthesis);
+      } else if (phase.messages.length > 0) {
+        // Render regular phase
+        this.renderPhase(phase);
+      }
     }
   }
 
   /**
    * Render a single phase with its messages.
    */
-  private renderPhase(phase: ParsedPhase): void {
+  private renderPhase(phase: BasePhase): void {
     const { leftMargin, contentWidth, pageBreakThreshold, colors } = PDF_CONFIG;
 
     if (this.doc.y > pageBreakThreshold) this.doc.addPage();
@@ -182,31 +285,33 @@ export class PDFRenderer {
 
     // Phase banner
     this.doc.fontSize(12).font("DejaVu-Bold");
-    const textHeight = this.doc.heightOfString(phase.title, { width: contentWidth - 30 });
+    const textHeight = this.doc.heightOfString(phase.name, { width: contentWidth - 30 });
     const bannerHeight = Math.max(30, textHeight + 16);
 
     const phaseY = this.doc.y;
     this.doc.rect(leftMargin, phaseY, contentWidth, bannerHeight).fill(colors.header);
     this.doc.fillColor("white");
-    this.doc.text(phase.title, leftMargin + 15, phaseY + 8, { width: contentWidth - 30 });
+    this.doc.text(phase.name, leftMargin + 15, phaseY + 8, { width: contentWidth - 30 });
     this.doc.y = phaseY + bannerHeight + 10;
 
-    // Render messages
+    // Render messages (skip synthesis messages - they're rendered separately)
     for (const msg of phase.messages) {
-      this.renderMessage(msg);
+      if (!isSynthesisMessage(msg)) {
+        this.renderMessage(msg);
+      }
     }
   }
 
   /**
-   * Render a single message (answer, critique, or position).
+   * Render a single message based on its type.
    */
-  private renderMessage(msg: ParsedMessage): void {
+  private renderMessage(msg: BaseMessage): void {
     const { messagePageBreak } = PDF_CONFIG;
     if (this.doc.y > messagePageBreak) this.doc.addPage();
 
-    if (msg.type === "critique") {
+    if (isCritiqueMessage(msg)) {
       this.renderCritiqueMessage(msg);
-    } else if (msg.type === "position") {
+    } else if (isPositionMessage(msg)) {
       this.renderPositionMessage(msg);
     } else {
       this.renderAnswerMessage(msg);
@@ -216,9 +321,10 @@ export class PDFRenderer {
   /**
    * Render a critique message with agreements/disagreements/missing sections.
    */
-  private renderCritiqueMessage(msg: ParsedMessage): void {
+  private renderCritiqueMessage(msg: BaseMessage): void {
     const { leftMargin, contentWidth, colors } = PDF_CONFIG;
     const source = this.formatModelName(msg.source);
+    const msgAny = msg as any;
 
     const msgY = this.doc.y;
     this.doc.rect(leftMargin, msgY, contentWidth, 22).fill(colors.critique);
@@ -226,25 +332,25 @@ export class PDFRenderer {
     this.doc.text(`${source} (${t("export.doc.critiqueLabel")})`, leftMargin + 10, msgY + 6);
     this.doc.y = msgY + 30;
 
-    if (msg.agreements) {
+    if (msgAny.agreements) {
       this.doc.font("DejaVu-Bold").fillColor(colors.agreements).text(`${t("export.doc.agreementsLabel")}`, leftMargin);
       this.doc.font("DejaVu").fillColor(colors.bodyText).fontSize(10);
       this.doc.x = leftMargin;
-      this.renderMarkdown(this.doc, msg.agreements, contentWidth);
+      this.renderMarkdown(this.doc, msgAny.agreements, contentWidth);
       this.doc.moveDown(0.3);
     }
-    if (msg.disagreements) {
+    if (msgAny.disagreements) {
       this.doc.font("DejaVu-Bold").fillColor(colors.disagreements).text(`${t("export.doc.disagreementsLabel")}`, leftMargin);
       this.doc.font("DejaVu").fillColor(colors.bodyText).fontSize(10);
       this.doc.x = leftMargin;
-      this.renderMarkdown(this.doc, msg.disagreements, contentWidth);
+      this.renderMarkdown(this.doc, msgAny.disagreements, contentWidth);
       this.doc.moveDown(0.3);
     }
-    if (msg.missing) {
+    if (msgAny.missing) {
       this.doc.font("DejaVu-Bold").fillColor(colors.missing).text(`${t("export.doc.missingLabel")}`, leftMargin);
       this.doc.font("DejaVu").fillColor(colors.bodyText).fontSize(10);
       this.doc.x = leftMargin;
-      this.renderMarkdown(this.doc, msg.missing, contentWidth);
+      this.renderMarkdown(this.doc, msgAny.missing, contentWidth);
     }
     this.doc.moveDown(1);
   }
@@ -252,22 +358,24 @@ export class PDFRenderer {
   /**
    * Render a final position message with confidence indicator.
    */
-  private renderPositionMessage(msg: ParsedMessage): void {
+  private renderPositionMessage(msg: BaseMessage): void {
     const { leftMargin, contentWidth, colors } = PDF_CONFIG;
     const source = this.formatModelName(msg.source);
+    const msgAny = msg as any;
 
     const msgY = this.doc.y;
     this.doc.rect(leftMargin, msgY, contentWidth, 22).fill(colors.position);
     this.doc.fillColor("white").fontSize(10).font("DejaVu-Bold");
     this.doc.text(`${source} (${t("export.doc.finalPositionLabel")})`, leftMargin + 10, msgY + 6);
 
-    const confColor = msg.confidence === "HIGH" ? colors.agreements
-      : msg.confidence === "MEDIUM" ? colors.missing
+    const confidence = msgAny.confidence || "";
+    const confColor = confidence === "HIGH" ? colors.agreements
+      : confidence === "MEDIUM" ? colors.missing
       : colors.disagreements;
 
     this.doc.y = msgY + 28;
     this.doc.fillColor(confColor).fontSize(10).font("DejaVu-Bold");
-    this.doc.text(`${t("export.doc.confidenceLabel")} ${translateConfidence(msg.confidence || "")}`, leftMargin);
+    this.doc.text(`${t("export.doc.confidenceLabel")} ${translateConfidence(confidence)}`, leftMargin);
 
     this.doc.fillColor(colors.bodyText).font("DejaVu").fontSize(10);
     this.doc.moveDown(0.3);
@@ -279,7 +387,7 @@ export class PDFRenderer {
   /**
    * Render a regular answer/chat message.
    */
-  private renderAnswerMessage(msg: ParsedMessage): void {
+  private renderAnswerMessage(msg: BaseMessage): void {
     const { leftMargin, contentWidth, colors } = PDF_CONFIG;
     const source = this.formatModelName(msg.source);
     const roleColor = getRoleColor(msg.role);
@@ -298,72 +406,108 @@ export class PDFRenderer {
   }
 
   /**
-   * Render the synthesis/result section.
+   * Render the synthesis phase (last phase) with special result styling.
    */
-  private renderSynthesis(synthesis: ParsedSynthesis): void {
+  private renderSynthesisPhase(phase: BasePhase, synthesis: BaseSynthesis): void {
     const { leftMargin, contentWidth, colors } = PDF_CONFIG;
 
     if (this.doc.y > 600) this.doc.addPage();
     this.doc.moveDown(1);
 
-    // Get method-specific terminology and banner color
-    const term = getMethodTerminology(synthesis.method as any);
+    // Get method-specific terminology
+    const term = getMethodTerminology(this.method);
     const bannerColor = term?.bannerColor || "#065f46";
 
-    // Result banner
+    // Result banner (use phase name which contains the localized title)
     const resultY = this.doc.y;
     this.doc.rect(leftMargin, resultY, contentWidth, 35).fill(bannerColor);
     this.doc.fillColor("white").fontSize(14).font("DejaVu-Bold");
-    this.doc.text(synthesis.resultLabel, leftMargin + 15, resultY + 10);
+    this.doc.text(phase.name, leftMargin + 15, resultY + 10);
     this.doc.y = resultY + 45;
 
-    // Consensus (skip for Advocate, and only if consensusLabel was parsed)
-    const method = synthesis.method.toLowerCase();
-    if (method !== "advocate" && synthesis.consensus && synthesis.consensusLabel) {
-      const consensusColor = this.getConsensusColor(method, synthesis.consensus);
+    // Get consensus/decision value from synthesis
+    const consensusValue = this.getConsensusValue(synthesis);
+
+    // Consensus line (skip for Advocate)
+    if (this.method !== "advocate" && consensusValue) {
+      const consensusColor = this.getConsensusColor(consensusValue);
       this.doc.fillColor(consensusColor).fontSize(12).font("DejaVu-Bold");
-      this.doc.text(`${synthesis.consensusLabel}: ${translateConsensus(synthesis.consensus)}`, leftMargin);
+      this.doc.text(`${term.consensusLabel}: ${translateConsensusValue(this.method, consensusValue)}`, leftMargin);
     }
 
-    // Synthesizer attribution (only if byLabel was parsed - prevents stray ":" if pattern mismatch)
-    if (synthesis.byLabel && synthesis.synthesizer) {
+    // Synthesizer attribution
+    if (synthesis.synthesizer) {
       this.doc.fillColor(colors.muted).fontSize(10).font("DejaVu");
-      this.doc.text(`${synthesis.byLabel}: ${this.formatModelName(synthesis.synthesizer)}`, leftMargin);
+      this.doc.text(`${term.byLabel}: ${this.formatModelName(synthesis.synthesizer)}`, leftMargin);
     }
     this.doc.moveDown(0.5);
 
     // Synthesis content
-    if (synthesis.synthesisLabel && synthesis.synthesis) {
-      this.doc.fillColor(colors.header).fontSize(12).font("DejaVu-Bold").text(synthesis.synthesisLabel);
+    if (synthesis.content) {
+      this.doc.fillColor(colors.header).fontSize(12).font("DejaVu-Bold").text(term.synthesisLabel);
       this.doc.fillColor(colors.bodyText).fontSize(10).font("DejaVu").moveDown(0.3);
       this.doc.x = leftMargin;
-      this.renderMarkdown(this.doc, synthesis.synthesis, contentWidth);
+      this.renderMarkdown(this.doc, synthesis.content, contentWidth);
     }
 
-    // Differences (skip placeholder for Advocate)
-    if (synthesis.differences && synthesis.differences !== "See verdict above for unresolved questions.") {
+    // Differences section
+    const differences = this.getDifferencesValue(synthesis);
+    if (differences && differences !== "See verdict above for unresolved questions.") {
       this.doc.moveDown(0.8);
-      this.doc.fillColor(colors.differences).fontSize(12).font("DejaVu-Bold").text(synthesis.differencesLabel);
+      this.doc.fillColor(colors.differences).fontSize(12).font("DejaVu-Bold").text(term.differencesLabel);
       this.doc.fillColor(colors.bodyText).fontSize(10).font("DejaVu").moveDown(0.3);
       this.doc.x = leftMargin;
-      this.renderMarkdown(this.doc, synthesis.differences, contentWidth);
+      this.renderMarkdown(this.doc, differences, contentWidth);
     }
+  }
+
+  /**
+   * Extract consensus/decision value from method-specific synthesis.
+   */
+  private getConsensusValue(synthesis: BaseSynthesis): string {
+    const synthAny = synthesis as any;
+    return (
+      synthAny.consensus ||
+      synthAny.decision ||
+      synthAny.aporeaReached ||
+      synthAny.convergence ||
+      synthAny.agreement ||
+      (synthAny.ideasSelected ? `${synthAny.ideasSelected} SELECTED` : "") ||
+      ""
+    );
+  }
+
+  /**
+   * Extract differences value from method-specific synthesis.
+   */
+  private getDifferencesValue(synthesis: BaseSynthesis): string {
+    const synthAny = synthesis as any;
+    return (
+      synthAny.differences ||
+      synthAny.keyContentions ||
+      synthAny.unresolvedQuestions ||
+      synthAny.openQuestions ||
+      synthAny.outlierPerspectives ||
+      synthAny.alternativeDirections ||
+      synthAny.keyTradeoffs ||
+      ""
+    );
   }
 
   /**
    * Get consensus color based on method and value.
    */
-  private getConsensusColor(method: string, consensus: string): string {
+  private getConsensusColor(consensus: string): string {
     const { colors } = PDF_CONFIG;
-    if (method === "oxford") {
+    if (this.method === "oxford") {
       return consensus === "FOR" ? colors.agreements
         : consensus === "AGAINST" ? colors.disagreements
         : colors.missing;
     }
-    if (method === "brainstorm") {
+    if (this.method === "brainstorm") {
       return colors.position;
     }
-    if (method === "tradeoff") {
+    if (this.method === "tradeoff") {
       return consensus === "YES" ? colors.agreements : colors.missing;
     }
     // Standard/Socratic/Delphi
