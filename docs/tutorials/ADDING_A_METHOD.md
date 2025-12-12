@@ -7,11 +7,12 @@ This tutorial walks through adding a new discussion method to Quorum. We'll use 
 Adding a method requires changes to:
 
 1. **`agents.py`** - Prompt templates and validation
-2. **`team.py`** - Orchestration flow
-3. **`ipc.py`** - Method validation list
-4. **Frontend** - TypeScript types and UI
-5. **Tests** - Method flow tests
-6. **Docs** - README and help
+2. **`methods/<name>.py`** - New orchestrator file (inherits from `BaseMethodOrchestrator`)
+3. **`team.py`** - Register method in the lazy-loading registry
+4. **`ipc.py`** - Method validation list
+5. **Frontend** - TypeScript types and UI
+6. **Tests** - Method flow tests
+7. **Docs** - README and help
 
 ## Step 1: Define the Method
 
@@ -147,121 +148,134 @@ Create a synthesis that presents:
 Format with CONSENSUS: [YES/PARTIAL/NO] at the start."""
 ```
 
-## Step 3: Add Orchestration (`team.py`)
+## Step 3: Create Method Orchestrator (`methods/ladder.py`)
 
-### 3.1 Add Flow Method
+### 3.1 Create New File
 
-In `team.py`, find `FourPhaseConsensusTeam` and add:
+Create `src/quorum/methods/ladder.py` inheriting from `BaseMethodOrchestrator`:
 
 ```python
-async def _run_ladder_flow(self, task: str):
-    """Run Ladder method: Propose → Rank → Climb → Synthesize."""
-    from .agents import (
-        DISCUSSION_PROMPT_LADDER_PROPOSE,
-        DISCUSSION_PROMPT_LADDER_RANK,
-        DISCUSSION_PROMPT_LADDER_CLIMB,
-    )
+"""Ladder method - Iterative idea elimination."""
 
-    # Phase 1: Propose
-    yield PhaseMarker(
-        phase=1,
-        message="Phase 1: Propose Solutions",
-        num_participants=len(self.model_ids),
-        method="ladder",
-        total_phases=3,
-    )
+from typing import AsyncIterator
 
-    proposals = []
-    # Run all models in parallel
-    async def get_proposal(model_id):
-        prompt = DISCUSSION_PROMPT_LADDER_PROPOSE.format(
-            language_instruction=get_language_instruction(),
+from ..agents import (
+    DISCUSSION_PROMPT_LADDER_PROPOSE,
+    DISCUSSION_PROMPT_LADDER_RANK,
+    DISCUSSION_PROMPT_LADDER_CLIMB,
+    get_language_instruction,
+)
+from .base import (
+    BaseMethodOrchestrator,
+    MessageType,
+    PhaseMarker,
+    IndependentAnswer,
+    TeamTextMessage,
+    ThinkingIndicator,
+)
+
+
+class LadderMethod(BaseMethodOrchestrator):
+    """Ladder method: Propose → Rank → Climb → Synthesize."""
+
+    METHOD_NAME = "ladder"
+    TOTAL_PHASES = 3
+
+    async def run(self, task: str) -> AsyncIterator[MessageType]:
+        """Run the Ladder discussion flow."""
+
+        # Phase 1: Propose
+        yield PhaseMarker(
+            phase=1,
+            message="Phase 1: Propose Solutions",
             num_participants=len(self.model_ids),
-        )
-        yield ThinkingIndicator(model=model_id)
-        response = await self._call_model(model_id, task, prompt)
-        return IndependentAnswer(source=model_id, content=response)
-
-    for coro in asyncio.as_completed([get_proposal(m) for m in self.model_ids]):
-        answer = await coro
-        proposals.append(answer)
-        yield answer
-
-    # Phase 2: Rank
-    yield PhaseMarker(
-        phase=2,
-        message="Phase 2: Rank and Eliminate",
-        num_participants=len(self.model_ids),
-        method="ladder",
-        total_phases=3,
-    )
-
-    all_proposals = self._format_answers(proposals)
-    rankings = []
-
-    for model_id in self.model_ids:
-        yield ThinkingIndicator(model=model_id)
-        prompt = DISCUSSION_PROMPT_LADDER_RANK.format(
-            language_instruction=get_language_instruction(),
-            all_initial_answers=all_proposals,
-        )
-        response = await self._call_model(model_id, task, prompt)
-        rankings.append(TeamTextMessage(
-            source=model_id,
-            content=response,
-            method="ladder",
-        ))
-        yield rankings[-1]
-
-    # Phase 3: Climb (refine top ideas)
-    yield PhaseMarker(
-        phase=3,
-        message="Phase 3: Climb to Consensus",
-        num_participants=len(self.model_ids),
-        method="ladder",
-        total_phases=3,
-    )
-
-    surviving_ideas = self._extract_top_ideas(rankings)  # Helper to parse rankings
-
-    for model_id in self.model_ids:
-        yield ThinkingIndicator(model=model_id)
-        prompt = DISCUSSION_PROMPT_LADDER_CLIMB.format(
-            language_instruction=get_language_instruction(),
-            discussion_history=surviving_ideas,
-        )
-        response = await self._call_model(model_id, task, prompt)
-        yield TeamTextMessage(
-            source=model_id,
-            content=response,
-            method="ladder",
+            method=self.METHOD_NAME,
+            total_phases=self.TOTAL_PHASES,
         )
 
-    # Synthesis
-    yield await self._run_synthesis_ladder(task, proposals, rankings)
+        proposals = []
+        for answer in await self._run_parallel_phase(
+            task,
+            DISCUSSION_PROMPT_LADDER_PROPOSE.format(
+                language_instruction=get_language_instruction(),
+                num_participants=len(self.model_ids),
+            ),
+        ):
+            proposals.append(answer)
+            yield answer
+
+        # Phase 2: Rank
+        yield PhaseMarker(
+            phase=2,
+            message="Phase 2: Rank and Eliminate",
+            num_participants=len(self.model_ids),
+            method=self.METHOD_NAME,
+            total_phases=self.TOTAL_PHASES,
+        )
+
+        all_proposals = self._format_answers(proposals)
+        rankings = []
+
+        for model_id in self.model_ids:
+            yield ThinkingIndicator(model=model_id)
+            prompt = DISCUSSION_PROMPT_LADDER_RANK.format(
+                language_instruction=get_language_instruction(),
+                all_initial_answers=all_proposals,
+            )
+            response = await self._call_model(model_id, task, prompt)
+            msg = TeamTextMessage(
+                source=model_id,
+                content=response,
+                method=self.METHOD_NAME,
+            )
+            rankings.append(msg)
+            yield msg
+
+        # Phase 3: Climb
+        yield PhaseMarker(
+            phase=3,
+            message="Phase 3: Climb to Consensus",
+            num_participants=len(self.model_ids),
+            method=self.METHOD_NAME,
+            total_phases=self.TOTAL_PHASES,
+        )
+
+        surviving_ideas = self._extract_top_ideas(rankings)
+
+        for model_id in self.model_ids:
+            yield ThinkingIndicator(model=model_id)
+            prompt = DISCUSSION_PROMPT_LADDER_CLIMB.format(
+                language_instruction=get_language_instruction(),
+                discussion_history=surviving_ideas,
+            )
+            response = await self._call_model(model_id, task, prompt)
+            yield TeamTextMessage(
+                source=model_id,
+                content=response,
+                method=self.METHOD_NAME,
+            )
+
+        # Synthesis
+        async for msg in self._run_synthesis(task):
+            yield msg
 ```
 
-### 3.2 Add to Method Dispatcher
+### 3.2 Register in `team.py`
 
-In the `run_stream` method, add the case:
+Add the method to the lazy-loading registry in `team.py`:
 
 ```python
-async def run_stream(self, task: str):
-    """Stream discussion messages."""
-    method = self.method_override or "standard"
-
-    if method == "standard":
-        async for msg in self._run_standard_flow(task):
-            yield msg
-    elif method == "oxford":
-        async for msg in self._run_oxford_flow(task):
-            yield msg
-    # ... other methods ...
-    elif method == "ladder":  # ADD THIS
-        async for msg in self._run_ladder_flow(task):
-            yield msg
-    else:
-        raise ValueError(f"Unknown method: {method}")
+# Method registry for lazy loading
+METHOD_REGISTRY = {
+    "standard": ("quorum.methods.standard", "StandardMethod"),
+    "oxford": ("quorum.methods.oxford", "OxfordMethod"),
+    "advocate": ("quorum.methods.advocate", "AdvocateMethod"),
+    "socratic": ("quorum.methods.socratic", "SocraticMethod"),
+    "delphi": ("quorum.methods.delphi", "DelphiMethod"),
+    "brainstorm": ("quorum.methods.brainstorm", "BrainstormMethod"),
+    "tradeoff": ("quorum.methods.tradeoff", "TradeoffMethod"),
+    "ladder": ("quorum.methods.ladder", "LadderMethod"),  # ADD THIS
+}
 ```
 
 ## Step 4: Update IPC (`ipc.py`)
@@ -412,8 +426,8 @@ cd frontend && npm run build && cd ..
 
 - [ ] Prompts added to `agents.py`
 - [ ] Validation added to `agents.py`
-- [ ] Flow method added to `team.py`
-- [ ] Dispatcher case added to `team.py`
+- [ ] Orchestrator class created in `methods/<name>.py`
+- [ ] Method registered in `team.py` METHOD_REGISTRY
 - [ ] Method added to `VALID_METHODS` in `ipc.py`
 - [ ] TypeScript types updated
 - [ ] Store/UI updated
@@ -429,6 +443,7 @@ cd frontend && npm run build && cd ..
 
 - **Start simple**: Get the basic flow working before adding special features
 - **Test incrementally**: Run tests after each major change
-- **Match existing patterns**: Look at how Oxford or Delphi are implemented
+- **Match existing patterns**: Look at `methods/oxford.py` or `methods/delphi.py` for examples
+- **Use base class helpers**: `BaseMethodOrchestrator` provides `_run_parallel_phase`, `_call_model`, `_run_synthesis`
 - **Consider edge cases**: What if a model times out? What if rankings conflict?
 - **Document decisions**: Add comments explaining non-obvious choices

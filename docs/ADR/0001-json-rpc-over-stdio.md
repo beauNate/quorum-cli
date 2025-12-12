@@ -7,7 +7,7 @@ Accepted
 ## Context
 
 Quorum consists of two processes:
-1. **Backend** (Python): Orchestrates AI model discussions using AutoGen
+1. **Backend** (Python): Orchestrates AI model discussions via direct SDK clients
 2. **Frontend** (TypeScript/Ink): Terminal UI for user interaction
 
 These processes need to communicate bidirectionally:

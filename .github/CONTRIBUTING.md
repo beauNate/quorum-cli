@@ -39,8 +39,8 @@ We welcome feature suggestions! Please [open a feature request](https://github.c
 
 ```bash
 # Clone your fork
-git clone https://github.com/YOUR_USERNAME/quorum.git
-cd quorum
+git clone https://github.com/YOUR_USERNAME/quorum-cli.git
+cd quorum-cli
 
 # Run the install script
 ./install.sh
@@ -85,12 +85,22 @@ pytest tests/test_live.py -v
 ## Project Structure
 
 ```
-quorum/
+quorum-cli/
 ├── src/quorum/          # Main source code
+│   ├── clients/         # Direct SDK clients (OpenAI, Anthropic)
+│   │   ├── types.py     # Message dataclasses, ChatClient protocol
+│   │   ├── openai_client.py   # OpenAI-compatible client
+│   │   └── anthropic_client.py # Anthropic client
+│   ├── methods/         # Discussion method orchestrators
+│   │   ├── base.py      # BaseMethodOrchestrator, message types
+│   │   ├── standard.py  # StandardMethod
+│   │   ├── oxford.py    # OxfordMethod
+│   │   └── ...          # Other methods
 │   ├── agents.py        # Prompt templates and method logic
 │   ├── config.py        # Settings and configuration
+│   ├── constants.py     # Version, limits, timeouts
 │   ├── ipc.py           # JSON-RPC communication
-│   ├── models.py        # Model client factory
+│   ├── models.py        # Model client factory, connection pooling
 │   ├── providers.py     # Provider detection
 │   └── team.py          # Main orchestration
 ├── frontend/            # React/Ink terminal UI
@@ -134,12 +144,15 @@ Quorum uses a **split architecture** with a Python backend and React/Ink fronten
 
 | Component | Responsibility |
 |-----------|----------------|
+| `clients/` | Direct SDK clients (OpenAI, Anthropic) with unified ChatClient protocol |
+| `methods/` | Discussion method orchestrators (Standard, Oxford, Socratic, etc.) |
 | `ipc.py` | JSON-RPC request handling, event emission, input validation |
-| `team.py` | Discussion orchestration, phase management, method flows |
+| `team.py` | Discussion orchestration, phase management, lazy method loading |
 | `agents.py` | Prompt templates, method requirements, role assignments |
 | `models.py` | Model client factory, connection pooling, validation |
-| `providers.py` | Provider detection from model ID prefix |
+| `providers.py` | Provider detection, Ollama auto-discovery |
 | `config.py` | Settings from .env, user preferences, cache management |
+| `constants.py` | Version info, protocol version, limits, timeouts |
 
 #### Frontend (`frontend/src/`)
 
@@ -209,7 +222,7 @@ The IPC protocol uses semantic versioning. When making changes:
 - **MAJOR**: Breaking changes to existing methods/events
 
 Update `PROTOCOL_VERSION` in both:
-- `src/quorum/ipc.py`
+- `src/quorum/constants.py`
 - `frontend/src/ipc/protocol.ts`
 
 ## Commit Messages
