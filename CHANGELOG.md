@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.1.1] - 2025-12-14
+
+### Fixed
+
+- **MCP Error Handling** - Added try/except for runtime errors during discussions
+  - API failures, timeouts, and unexpected errors now return structured JSON responses
+  - Improved tool description with model requirements (min 2, Oxford=even, Advocate/Delphi=3+)
+
+- **Test Compatibility** - Fixed `_write_json` to handle StringIO in tests
+  - Falls back to regular write when `stdout.buffer` not available
+  - Resolves 8 failing tests in CI
+
+- **Pytest Collection** - Excluded MCP module from test collection
+  - MCP requires `mcp` dependency not installed in test environment
+  - Added `src/conftest.py` with `collect_ignore`
+
+---
+
 ## [1.1.0] - 2025-12-14
 
 ### Added

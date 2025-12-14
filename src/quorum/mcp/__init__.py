@@ -117,7 +117,12 @@ async def list_tools() -> list[types.Tool]:
     return [
         types.Tool(
             name="quorum_discuss",
-            description="Run a multi-model AI discussion using Quorum. After the discussion completes, present the synthesis to the user in a clear, readable format.",
+            description=(
+                "Run a multi-model AI discussion using Quorum. "
+                "Model requirements: minimum 2 models; Oxford needs even count (2,4,6); "
+                "Advocate and Delphi need 3+. See quorum://methods resource for details. "
+                "After the discussion completes, present the synthesis to the user."
+            ),
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -185,45 +190,76 @@ async def _handle_discuss(args: dict[str, Any]) -> list[types.TextContent]:
     method = args.get("method", "standard")
     full_output = args.get("full_output", False)
 
-    team = FourPhaseConsensusTeam(
-        model_ids=model_ids,
-        method_override=method,
-    )
-
-    # Collect messages
+    # Initialize before try block so they're available in except
     synthesis = None
-    all_messages = []
+    all_messages: list[dict] = []
 
-    async for msg in team.run_stream(question):
-        if hasattr(msg, "__dict__"):
-            msg_dict = {
-                "type": type(msg).__name__,
-                **msg.__dict__,
+    try:
+        team = FourPhaseConsensusTeam(
+            model_ids=model_ids,
+            method_override=method,
+        )
+
+        async for msg in team.run_stream(question):
+            if hasattr(msg, "__dict__"):
+                msg_dict = {
+                    "type": type(msg).__name__,
+                    **msg.__dict__,
+                }
+                all_messages.append(msg_dict)
+
+                # Capture synthesis for compact output
+                if type(msg).__name__ == "SynthesisResult":
+                    synthesis = msg_dict
+
+        # Return full output or just synthesis
+        if full_output:
+            return [types.TextContent(type="text", text=json.dumps(all_messages, indent=2))]
+
+        # Compact: return only synthesis
+        if synthesis:
+            # Clean up synthesis for readability
+            compact_result = {
+                "consensus": synthesis.get("consensus"),
+                "synthesis": synthesis.get("synthesis"),
+                "differences": synthesis.get("differences"),
+                "method": synthesis.get("method"),
+                "models": model_ids,
             }
-            all_messages.append(msg_dict)
+            return [types.TextContent(type="text", text=json.dumps(compact_result, indent=2))]
 
-            # Capture synthesis for compact output
-            if type(msg).__name__ == "SynthesisResult":
-                synthesis = msg_dict
-
-    # Return full output or just synthesis
-    if full_output:
+        # Fallback if no synthesis (shouldn't happen)
         return [types.TextContent(type="text", text=json.dumps(all_messages, indent=2))]
 
-    # Compact: return only synthesis
-    if synthesis:
-        # Clean up synthesis for readability
-        compact_result = {
-            "consensus": synthesis.get("consensus"),
-            "synthesis": synthesis.get("synthesis"),
-            "differences": synthesis.get("differences"),
-            "method": synthesis.get("method"),
-            "models": model_ids,
-        }
-        return [types.TextContent(type="text", text=json.dumps(compact_result, indent=2))]
+    except ValueError as e:
+        # Configuration errors (invalid model, missing API key, etc.)
+        return [types.TextContent(
+            type="text",
+            text=json.dumps({
+                "error": str(e),
+                "error_type": "configuration",
+                "models": model_ids,
+                "method": method,
+            }),
+        )]
 
-    # Fallback if no synthesis (shouldn't happen)
-    return [types.TextContent(type="text", text=json.dumps(all_messages, indent=2))]
+    except Exception as e:
+        # Unexpected errors during discussion
+        error_msg = str(e)
+        # Truncate very long error messages
+        if len(error_msg) > 500:
+            error_msg = error_msg[:500] + "..."
+
+        return [types.TextContent(
+            type="text",
+            text=json.dumps({
+                "error": error_msg,
+                "error_type": "discussion_failed",
+                "models": model_ids,
+                "method": method,
+                "partial_results": len(all_messages),
+            }),
+        )]
 
 
 # ─────────────────────────────────────────────────────────────
@@ -239,7 +275,7 @@ async def _run_server() -> None:
             write,
             InitializationOptions(
                 server_name="quorum",
-                server_version="1.1.0",
+                server_version="1.1.1",
                 capabilities=server.get_capabilities(
                     notification_options=NotificationOptions(),
                     experimental_capabilities={},

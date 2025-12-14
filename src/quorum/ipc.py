@@ -444,11 +444,17 @@ class IPCHandler:
 
         Uses stdout.buffer with UTF-8 encoding to avoid Windows codepage issues.
         Windows default stdout uses cp1252 which can't encode all Unicode characters.
+        Falls back to regular write for testing (StringIO doesn't have .buffer).
         """
         line = json.dumps(obj, ensure_ascii=False, default=self._json_default)
         # Write as UTF-8 bytes to avoid Windows codepage encoding errors
-        sys.stdout.buffer.write((line + "\n").encode("utf-8"))
-        sys.stdout.buffer.flush()
+        # Fall back to regular write if buffer not available (e.g., StringIO in tests)
+        if hasattr(sys.stdout, "buffer"):
+            sys.stdout.buffer.write((line + "\n").encode("utf-8"))
+            sys.stdout.buffer.flush()
+        else:
+            sys.stdout.write(line + "\n")
+            sys.stdout.flush()
 
     def _json_default(self, obj: Any) -> Any:
         """Handle non-serializable objects."""
