@@ -7,7 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-<!-- Changes after 1.0.7 release go here -->
+---
+
+## [1.1.0] - 2025-12-14
+
+### Added
+
+- **MCP Server** - Model Context Protocol integration for Claude Code/Desktop
+  - New `quorum-mcp-server` command for MCP integration
+  - Install once, use everywhere: `claude mcp add quorum -- quorum-mcp-server`
+  - **Tools:**
+    - `quorum_discuss` - Run multi-model discussions with any method
+    - `quorum_list_models` - List configured models
+  - **Resources:**
+    - `quorum://models` - Available models per provider
+    - `quorum://methods` - The 7 discussion methods with descriptions
+  - Compact output by default (synthesis only) - saves ~90% context
+  - Set `full_output: true` for complete discussion transcript
+  - Reuses existing `~/.quorum/.env` config - no duplicate API keys needed
+
+- **Message Render Delay** - Added 150ms delay between content messages
+  - Gives frontend time to process and render messages
+  - Only applies to content events (answers, critiques, positions)
+  - Control messages (phase markers, thinking indicators) are not delayed
+
+### Fixed
+
+- **Windows Unicode Output** - Fixed IPC stdout encoding for Windows
+  - Model responses containing Unicode characters (≥, ≤, →, etc.) now display correctly
+  - Changed JSON output to write UTF-8 bytes directly to `stdout.buffer`
+  - Windows default stdout uses cp1252 which can't encode all Unicode characters
+  - Primarily affected GPT models which often include math symbols in responses
 
 ---
 
@@ -212,7 +242,8 @@ User cache (`~/.quorum/`):
 
 ---
 
-[Unreleased]: https://github.com/Detrol/quorum-cli/compare/v1.0.7...HEAD
+[Unreleased]: https://github.com/Detrol/quorum-cli/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/Detrol/quorum-cli/compare/v1.0.7...v1.1.0
 [1.0.7]: https://github.com/Detrol/quorum-cli/compare/v1.0.5...v1.0.7
 [1.0.5]: https://github.com/Detrol/quorum-cli/compare/v1.0.4...v1.0.5
 [1.0.4]: https://github.com/Detrol/quorum-cli/compare/v1.0.3...v1.0.4

@@ -28,10 +28,12 @@ dependencies = [
     "pydantic>=2.0,<3.0",
     "pydantic-settings>=2.0,<3.0",
     "httpx>=0.24,<1.0",
+    "mcp>=1.0.0",
 ]
 
 [project.scripts]
 quorum = "quorum.main:main"
+quorum-mcp-server = "quorum.mcp:main"
 
 [project.urls]
 Homepage = "https://github.com/Detrol/quorum-cli"

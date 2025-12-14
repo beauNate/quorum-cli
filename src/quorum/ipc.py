@@ -22,6 +22,7 @@ from .constants import (
     MAX_MODEL_ID_LENGTH,
     MAX_MODELS,
     MAX_QUESTION_LENGTH,
+    MESSAGE_RENDER_DELAY,
     PAUSE_TIMEOUT_SECONDS,
     PROTOCOL_VERSION,
     RATE_LIMIT_BURST_SIZE,
@@ -331,6 +332,15 @@ class IPCHandler:
             except asyncio.QueueEmpty:
                 break
 
+    # Content event types that need delay after writing (for frontend to process)
+    _CONTENT_EVENTS_FOR_DRAIN = frozenset({
+        "independent_answer",
+        "critique",
+        "final_position",
+        "chat_message",
+        "synthesis",
+    })
+
     async def _drain_events(self) -> None:
         """Background task that drains events from queue to stdout."""
         while self._draining:
@@ -339,6 +349,12 @@ class IPCHandler:
                 if event is None:  # Sentinel
                     break
                 self._write_json(event)
+
+                # Add delay AFTER writing content events to give frontend time to process
+                event_method = event.get("method", "")
+                if event_method in self._CONTENT_EVENTS_FOR_DRAIN:
+                    await asyncio.sleep(MESSAGE_RENDER_DELAY)
+
             except asyncio.CancelledError:
                 break
             except Exception:
@@ -362,6 +378,9 @@ class IPCHandler:
             "params": params,
         }
         await self._event_queue.put(event)
+        # Yield to event loop to allow drain task to process
+        # Without this, rapid sequential puts can starve the drain task
+        await asyncio.sleep(0)
 
     def emit_event(self, method: str, params: dict[str, Any]) -> None:
         """Emit a JSON-RPC notification (no id = no response expected).
@@ -421,10 +440,15 @@ class IPCHandler:
         self._write_json(response)
 
     def _write_json(self, obj: dict) -> None:
-        """Write a JSON object to stdout as a single line."""
+        """Write a JSON object to stdout as a single line.
+
+        Uses stdout.buffer with UTF-8 encoding to avoid Windows codepage issues.
+        Windows default stdout uses cp1252 which can't encode all Unicode characters.
+        """
         line = json.dumps(obj, ensure_ascii=False, default=self._json_default)
-        sys.stdout.write(line + "\n")
-        sys.stdout.flush()
+        # Write as UTF-8 bytes to avoid Windows codepage encoding errors
+        sys.stdout.buffer.write((line + "\n").encode("utf-8"))
+        sys.stdout.buffer.flush()
 
     def _json_default(self, obj: Any) -> Any:
         """Handle non-serializable objects."""
@@ -968,6 +992,7 @@ class IPCHandler:
         """Convert a message to IPC event and emit it asynchronously (with backpressure).
 
         Automatically injects discussion_id into all events for filtering stale events.
+        Content message delays are handled by _drain_events after writing to stdout.
         """
         event = self._format_message_event(message)
         if event:

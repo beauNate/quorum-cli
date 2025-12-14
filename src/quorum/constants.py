@@ -7,7 +7,7 @@ Centralizes magic numbers, limits, and configuration values.
 # Version Information
 # =============================================================================
 
-__version__ = "1.0.7"
+__version__ = "1.1.0"
 """Quorum application version."""
 
 PROTOCOL_VERSION = "1.0.0"
@@ -110,6 +110,17 @@ memory exhaustion during long discussions with multiple agents.
 
 MAX_IPC_EVENT_QUEUE_SIZE = 100
 """Maximum events in IPC backpressure queue."""
+
+MESSAGE_RENDER_DELAY = 0.15
+"""Delay between content messages in seconds.
+
+This delay serves two purposes:
+1. UX: Gives a natural staggered appearance to message rendering
+2. Technical: Ensures IPC drain task has time to process events
+
+Only applied to content messages (answers, critiques, positions),
+not control messages (phase markers, thinking indicators).
+"""
 
 MAX_JSON_REQUEST_SIZE = 1_000_000
 """Maximum JSON request size in bytes (1MB).

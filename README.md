@@ -6,7 +6,8 @@
 
 <p align="center">
   <strong>AI War Room in your terminal.</strong><br>
-  Watch GPT, Claude, Gemini, and Grok debate using formal methods.
+  Watch GPT, Claude, Gemini, and Grok debate using formal methods.<br>
+  <em>Now with MCP support for Claude Code/Desktop.</em>
 </p>
 
 <p align="center">
@@ -37,6 +38,29 @@ quorum
 **Upgrade:** `pip install -U quorum-cli`
 
 **Requirements:** Python 3.11+, Node.js 18+
+
+---
+
+## Claude Code / Desktop Integration (MCP)
+
+Use Quorum directly from Claude Code or Claude Desktop via Model Context Protocol:
+
+```bash
+# After installing quorum-cli
+claude mcp add quorum -- quorum-mcp-server
+```
+
+Then in Claude:
+> "Use Quorum to discuss whether we should use PostgreSQL or MongoDB with GPT and Claude"
+
+**MCP Tools:**
+- `quorum_discuss` - Run multi-model discussions with any of the 7 methods
+- `quorum_list_models` - List your configured models
+
+**Features:**
+- Reuses your existing `~/.quorum/.env` config - no duplicate API keys
+- Compact output by default (synthesis only) - saves context
+- Set `full_output: true` for complete discussion transcript
 
 ---
 
