@@ -58,6 +58,7 @@ Then in Claude:
 - `quorum_list_models` - List your configured models
 
 **Features:**
+- Pass `files` parameter to include code/docs as context (max 10 files, 100KB each)
 - Reuses your existing `~/.quorum/.env` config - no duplicate API keys
 - Compact output by default (synthesis only) - saves context
 - Set `full_output: true` for complete discussion transcript

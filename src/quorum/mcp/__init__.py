@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import sys
+from pathlib import Path
 from typing import Any
 
 import mcp.server.stdio
@@ -16,6 +17,11 @@ from quorum.config import get_settings
 from quorum.ipc import VALID_METHODS
 from quorum.providers import list_all_models_sync
 from quorum.team import FourPhaseConsensusTeam
+
+# Limits for file reading
+MAX_FILES = 10
+MAX_FILE_SIZE = 100_000  # 100KB per file
+MAX_TOTAL_CONTEXT = 500_000  # 500KB total
 
 # Method descriptions for the resource
 METHOD_INFO = {
@@ -146,6 +152,11 @@ async def list_tools() -> list[types.Tool]:
                         "default": False,
                         "description": "Return full discussion (all phases). Default: false (only synthesis)",
                     },
+                    "files": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Absolute file paths to include as context (max 10 files, 100KB each)",
+                    },
                 },
                 "required": ["question", "models"],
             },
@@ -183,12 +194,78 @@ async def _handle_list_models() -> list[types.TextContent]:
     return [types.TextContent(type="text", text=json.dumps(serializable, indent=2))]
 
 
+def _read_files(file_paths: list[str]) -> tuple[str, list[str]]:
+    """Read files and return formatted context string.
+
+    Args:
+        file_paths: List of absolute file paths to read.
+
+    Returns:
+        Tuple of (context_string, errors).
+    """
+    if len(file_paths) > MAX_FILES:
+        return "", [f"Too many files: {len(file_paths)} > {MAX_FILES}"]
+
+    context_parts = []
+    errors = []
+    total_size = 0
+
+    for path_str in file_paths:
+        try:
+            path = Path(path_str)
+            if not path.is_absolute():
+                errors.append(f"Not absolute path: {path_str}")
+                continue
+
+            if not path.exists():
+                errors.append(f"File not found: {path_str}")
+                continue
+
+            if not path.is_file():
+                errors.append(f"Not a file: {path_str}")
+                continue
+
+            size = path.stat().st_size
+            if size > MAX_FILE_SIZE:
+                errors.append(f"File too large ({size} > {MAX_FILE_SIZE}): {path_str}")
+                continue
+
+            if total_size + size > MAX_TOTAL_CONTEXT:
+                errors.append(f"Total context limit reached, skipping: {path_str}")
+                continue
+
+            content = path.read_text(encoding="utf-8", errors="replace")
+            total_size += len(content)
+
+            # Format with filename header
+            context_parts.append(f"=== {path.name} ===\n{content}")
+
+        except Exception as e:
+            errors.append(f"Error reading {path_str}: {e}")
+
+    context = "\n\n".join(context_parts)
+    return context, errors
+
+
 async def _handle_discuss(args: dict[str, Any]) -> list[types.TextContent]:
     """Run a Quorum discussion."""
     question = args["question"]
     model_ids = args["models"]
     method = args.get("method", "standard")
     full_output = args.get("full_output", False)
+    file_paths = args.get("files", [])
+
+    # Read files if provided
+    file_context = ""
+    file_errors: list[str] = []
+    if file_paths:
+        file_context, file_errors = _read_files(file_paths)
+
+    # Build full question with file context
+    if file_context:
+        full_question = f"Context files:\n\n{file_context}\n\n---\n\nQuestion: {question}"
+    else:
+        full_question = question
 
     # Initialize before try block so they're available in except
     synthesis = None
@@ -200,7 +277,7 @@ async def _handle_discuss(args: dict[str, Any]) -> list[types.TextContent]:
             method_override=method,
         )
 
-        async for msg in team.run_stream(question):
+        async for msg in team.run_stream(full_question):
             if hasattr(msg, "__dict__"):
                 msg_dict = {
                     "type": type(msg).__name__,
@@ -219,13 +296,17 @@ async def _handle_discuss(args: dict[str, Any]) -> list[types.TextContent]:
         # Compact: return only synthesis
         if synthesis:
             # Clean up synthesis for readability
-            compact_result = {
+            compact_result: dict[str, Any] = {
                 "consensus": synthesis.get("consensus"),
                 "synthesis": synthesis.get("synthesis"),
                 "differences": synthesis.get("differences"),
                 "method": synthesis.get("method"),
                 "models": model_ids,
             }
+            if file_errors:
+                compact_result["file_errors"] = file_errors
+            if file_paths:
+                compact_result["files_included"] = len(file_paths) - len(file_errors)
             return [types.TextContent(type="text", text=json.dumps(compact_result, indent=2))]
 
         # Fallback if no synthesis (shouldn't happen)
@@ -275,7 +356,7 @@ async def _run_server() -> None:
             write,
             InitializationOptions(
                 server_name="quorum",
-                server_version="1.1.1",
+                server_version="1.1.2",
                 capabilities=server.get_capabilities(
                     notification_options=NotificationOptions(),
                     experimental_capabilities={},

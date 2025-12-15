@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.1.2] - 2025-12-15
+
+### Added
+
+- **MCP File Context** - Pass files directly to discussions via `files` parameter
+  - MCP server reads files and includes them as context
+  - Limits: max 10 files, 100KB per file, 500KB total
+  - Reports `files_included` count and `file_errors` in response
+
+### Changed
+
+- **Auto GitHub Releases** - Tags now automatically create GitHub Releases
+  - Extracts changelog notes for the tagged version
+  - Attaches `.whl` artifact to release
+
+---
+
 ## [1.1.1] - 2025-12-14
 
 ### Fixed
