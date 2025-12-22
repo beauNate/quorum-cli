@@ -9,6 +9,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.1.4] - 2025-12-22
+
+### Changed
+
+- **Local-first config loading** - When `./.env` exists in current directory, use it exclusively
+  - Previously loaded both `~/.quorum/.env` and `./.env` and merged them
+  - Now uses local-first priority: local `.env` if present, otherwise global `~/.quorum/.env`
+  - Prevents confusing merged model lists when running from different project directories
+
+### Fixed
+
+- **Phase 4 Insight Preservation** - Final positions now include full discussion context
+  - Previously, Phase 3 discussion was not passed to Phase 4, causing models to lose valuable insights
+  - Now `_discussion_messages` stores the complete Phase 3 discussion and passes it to `get_final_position_prompt()`
+  - Prompt updated to encourage including "specific thresholds, frameworks, or conditions" from discussion
+  - Removed "be concise" instruction that triggered information loss
+
+- **Socratic Method Prompt** - Changed "Be concise but complete" to "Be thorough and complete"
+  - Prevents respondents from over-compressing their answers
+
+- **Selected models filtering** - Cached selected models are now filtered against available models
+  - Previously, switching configs could show stale models from old config
+  - Now `selected_models` in `~/.quorum/settings.json` is filtered to only show available models
+
+---
+
 ## [1.1.3] - 2025-12-21
 
 ### Changed

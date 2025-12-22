@@ -667,9 +667,24 @@ class IPCHandler:
         """Handle get_user_settings request.
 
         Returns cached user settings (selected_models, method, synthesizer, etc).
+        Filters selected_models to only include models available in current config.
         """
         from .config import get_user_settings
-        return get_user_settings()
+        from .providers import list_all_models_sync
+
+        settings = get_user_settings()
+
+        # Filter selected_models to only include currently available models
+        if "selected_models" in settings:
+            all_models = list_all_models_sync()
+            available_ids = {
+                m.id for models in all_models.values() for m in models
+            }
+            settings["selected_models"] = [
+                m for m in settings["selected_models"] if m in available_ids
+            ]
+
+        return settings
 
     async def _handle_save_user_settings(self, params: dict) -> dict:
         """Handle save_user_settings request.

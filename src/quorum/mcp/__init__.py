@@ -373,7 +373,7 @@ async def _run_server() -> None:
             write,
             InitializationOptions(
                 server_name="quorum",
-                server_version="1.1.3",
+                server_version="1.1.4",
                 capabilities=server.get_capabilities(
                     notification_options=NotificationOptions(),
                     experimental_capabilities={},

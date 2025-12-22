@@ -69,6 +69,7 @@ class StandardMethod(BaseMethodOrchestrator):
         self._initial_responses: dict[str, str] = {}
         self._critiques: dict[str, CritiqueResponse] = {}
         self._final_positions: list[FinalPosition] = []
+        self._discussion_messages: list[str] = []  # Store Phase 3 discussion for Phase 4
 
     async def run_stream(self, task: str) -> AsyncIterator[MessageType]:
         """Run 5-phase consensus discussion."""
@@ -344,7 +345,9 @@ class StandardMethod(BaseMethodOrchestrator):
             user_msg = f"Question: {task}\n\nContribute to the discussion."
             response = await self._get_model_response(model_id, prompt, user_msg)
 
-            discussion_history.append(f"{self._display_name(model_id)}:\n{response}")
+            message_text = f"{self._display_name(model_id)}:\n{response}"
+            discussion_history.append(message_text)
+            self._discussion_messages.append(message_text)  # Store for Phase 4
 
             yield self._create_team_message(model_id, response)
 
@@ -354,7 +357,9 @@ class StandardMethod(BaseMethodOrchestrator):
 
     async def _run_phase4_final_positions(self, task: str) -> list[FinalPosition]:
         """Phase 4: Get final positions with confidence from all models."""
-        final_prompt = get_final_position_prompt(task)
+        # Build discussion summary from Phase 3
+        discussion_summary = "\n\n".join(self._discussion_messages) if self._discussion_messages else ""
+        final_prompt = get_final_position_prompt(task, discussion_summary)
 
         async def get_final_position(model_id: str) -> FinalPosition:
             try:

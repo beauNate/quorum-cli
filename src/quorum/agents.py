@@ -550,7 +550,7 @@ Your task:
 2. Explain your reasoning step by step
 3. Acknowledge uncertainty where it exists
 4. If the question reveals a flaw in your thinking, admit it honestly
-5. Be concise but complete
+5. Be thorough and complete
 
 CONTEXT FROM INITIAL ANSWERS:
 {all_initial_answers}
@@ -717,15 +717,19 @@ The AI-to-AI discussion is now complete.
 ORIGINAL QUESTION:
 {original_question}
 
-State YOUR final position after considering all perspectives.
+DISCUSSION SUMMARY:
+{discussion_summary}
+
+State YOUR final position, incorporating what you learned from the discussion.
 
 IMPORTANT:
+- Include specific thresholds, frameworks, or conditions that emerged from the discussion
+- Reference key points of agreement or disagreement
 - State your position only - do NOT ask for user input
 - Do NOT end with "let me know if you want more details"
-- This is your FINAL conclusion
 
 Format EXACTLY as:
-POSITION: [your final answer - be concise]
+POSITION: [your refined final answer, incorporating discussion insights]
 CONFIDENCE: [HIGH/MEDIUM/LOW]
 
 Where:
@@ -821,11 +825,12 @@ def get_critique_prompt(
     )
 
 
-def get_final_position_prompt(original_question: str) -> str:
+def get_final_position_prompt(original_question: str, discussion_summary: str = "") -> str:
     """Get the final position prompt (Phase 4).
 
     Args:
         original_question: The original question being discussed.
+        discussion_summary: Summary of Phase 3 discussion to provide context.
 
     Returns:
         Formatted final position prompt.
@@ -833,6 +838,7 @@ def get_final_position_prompt(original_question: str) -> str:
     return FINAL_POSITION_PROMPT.format(
         language_instruction=get_language_instruction(),
         original_question=original_question,
+        discussion_summary=discussion_summary if discussion_summary else "[No discussion summary available]",
     )
 
 

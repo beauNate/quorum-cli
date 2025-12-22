@@ -181,8 +181,12 @@ class TestSettings:
     """
 
     @pytest.fixture(autouse=True)
-    def clear_env(self, monkeypatch):
-        """Clear all API key environment variables for isolated tests."""
+    def clear_env(self, monkeypatch, tmp_path):
+        """Clear all API key environment variables for isolated tests.
+
+        Also mocks _get_active_env_file to return a non-existent path,
+        preventing tests from picking up real .env files.
+        """
         env_vars = [
             "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GOOGLE_API_KEY", "XAI_API_KEY",
             "OPENAI_MODELS", "ANTHROPIC_MODELS", "GOOGLE_MODELS", "XAI_MODELS",
@@ -191,6 +195,14 @@ class TestSettings:
         ]
         for var in env_vars:
             monkeypatch.delenv(var, raising=False)
+
+        # Mock _get_active_env_file to return non-existent path
+        # This prevents tests from loading real .env files
+        monkeypatch.setattr(
+            quorum.config,
+            "_get_active_env_file",
+            lambda: tmp_path / ".env.nonexistent",
+        )
 
     def test_get_models_empty(self):
         """Test getting models when none configured."""

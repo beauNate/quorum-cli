@@ -11,6 +11,7 @@ from pathlib import Path
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings.sources import DotEnvSettingsSource
 
 # API key validation patterns and lengths
 API_KEY_MIN_LENGTH = 20  # Minimum reasonable API key length
@@ -169,14 +170,48 @@ def add_to_input_history(input_text: str, max_items: int = 100) -> None:
     _write_secure_file(INPUT_HISTORY_CACHE, json.dumps({"history": history}))
 
 
+def _get_active_env_file() -> Path:
+    """Get the active .env file using local-first priority.
+
+    If ./.env exists in current directory, use it exclusively.
+    Otherwise fall back to ~/.quorum/.env for global config.
+    """
+    local_env = Path(".env")
+    if local_env.exists():
+        return local_env
+    return CACHE_DIR / ".env"
+
+
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
     model_config = SettingsConfigDict(
-        env_file=(CACHE_DIR / ".env", ".env"),  # ~/.quorum/.env first, then ./.env
         env_file_encoding="utf-8",
         extra="ignore",
     )
+
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls: type[BaseSettings],
+        init_settings,
+        env_settings,
+        dotenv_settings,
+        file_secret_settings,
+    ):
+        """Use local .env if exists, otherwise global ~/.quorum/.env.
+
+        Local-first priority: If ./.env exists in the current working directory,
+        use it exclusively. Otherwise fall back to ~/.quorum/.env for global config.
+        This prevents confusing merged configs when running from different directories.
+        """
+        env_file = _get_active_env_file()
+        dotenv_settings = DotEnvSettingsSource(
+            settings_cls,
+            env_file=env_file,
+            env_file_encoding="utf-8",
+        )
+        return (init_settings, env_settings, dotenv_settings, file_secret_settings)
 
     # API Keys
     openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
