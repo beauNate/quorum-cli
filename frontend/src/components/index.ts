@@ -10,3 +10,4 @@ export { Header } from "./Header.js";
 export { TeamPreview } from "./TeamPreview.js";
 export { ExportSelector } from "./ExportSelector.js";
 export { MethodAdvisor } from "./MethodAdvisor.js";
+export { LanguageSelector } from "./LanguageSelector.js";

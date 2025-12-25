@@ -60,6 +60,11 @@ export const sv: Translations = {
   "selector.synthesizer.title": "Välj syntetiserare",
   "selector.synthesizer.navigation": "↑↓ Navigera • Enter Välj • Esc Stäng",
 
+  // Language Selector
+  "selector.language.title": "Svarsspråk",
+  "selector.language.navigation": "↑↓ Navigera • Enter Välj • Esc Stäng",
+  "cmd.language": "Ändra svarsspråk",
+
   // Method Names and Descriptions
   "method.standard.name": "Standard",
   "method.standard.desc": "Balanserad konsensussökande diskussion",

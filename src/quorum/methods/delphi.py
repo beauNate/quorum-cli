@@ -122,7 +122,7 @@ class DelphiMethod(BaseMethodOrchestrator):
             agent_name = _make_valid_identifier(model_id)
 
             if round_number == 1:
-                prompt = get_delphi_round1_prompt(num_participants, task)
+                prompt = get_delphi_round1_prompt(num_participants, task, use_settings=self.use_language_settings)
                 user_msg = task
             else:
                 previous_estimate = ""
@@ -136,6 +136,7 @@ class DelphiMethod(BaseMethodOrchestrator):
                     your_previous_estimate=previous_estimate,
                     group_estimates=group_estimates or "",
                     group_statistics=group_statistics or "",
+                    use_settings=self.use_language_settings,
                 )
                 user_msg = f"Question: {task}\n\nRevise your estimate if warranted."
 
@@ -220,6 +221,7 @@ class DelphiMethod(BaseMethodOrchestrator):
             num_participants=num_participants,
             final_estimates=final_estimates,
             estimate_history=estimate_history,
+            use_settings=self.use_language_settings,
         )
 
         try:

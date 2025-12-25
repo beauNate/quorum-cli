@@ -93,7 +93,7 @@ class BrainstormMethod(BaseMethodOrchestrator):
     async def _run_brainstorm_diverge(self, task: str) -> dict[str, str]:
         """Phase 1: All models generate wild ideas in parallel."""
         num_participants = len(self.model_ids)
-        prompt = get_brainstorm_diverge_prompt(num_participants, task)
+        prompt = get_brainstorm_diverge_prompt(num_participants, task, use_settings=self.use_language_settings)
         return await self._run_parallel_phase(
             prompt_builder=lambda _: prompt,
             user_message=task,
@@ -102,7 +102,7 @@ class BrainstormMethod(BaseMethodOrchestrator):
     async def _run_brainstorm_build(self, all_ideas: str) -> dict[str, str]:
         """Phase 2: All models build on ideas in parallel."""
         num_participants = len(self.model_ids)
-        prompt = get_brainstorm_build_prompt(num_participants, all_ideas)
+        prompt = get_brainstorm_build_prompt(num_participants, all_ideas, use_settings=self.use_language_settings)
         return await self._run_parallel_phase(
             prompt_builder=lambda _: prompt,
             user_message="Build on the most promising ideas.",
@@ -111,7 +111,7 @@ class BrainstormMethod(BaseMethodOrchestrator):
     async def _run_brainstorm_converge(self, all_content: str) -> dict[str, str]:
         """Phase 3: All models select top ideas in parallel."""
         num_participants = len(self.model_ids)
-        prompt = get_brainstorm_converge_prompt(num_participants, all_content)
+        prompt = get_brainstorm_converge_prompt(num_participants, all_content, use_settings=self.use_language_settings)
         return await self._run_parallel_phase(
             prompt_builder=lambda _: prompt,
             user_message="Select your top 3 ideas.",
@@ -139,6 +139,7 @@ class BrainstormMethod(BaseMethodOrchestrator):
             question=task,
             num_participants=num_participants,
             all_selections=all_selections,
+            use_settings=self.use_language_settings,
         )
 
         try:

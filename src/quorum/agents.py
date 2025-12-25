@@ -2,29 +2,48 @@
 
 from __future__ import annotations
 
-from .config import get_settings
+from .config import get_response_language
+
+# Map language codes to full names for prompts
+LANGUAGE_NAMES = {
+    "en": "English",
+    "sv": "Swedish",
+    "de": "German",
+    "fr": "French",
+    "es": "Spanish",
+    "it": "Italian",
+}
 
 
-def get_language_instruction() -> str:
-    """Get language instruction based on config.
+def get_language_instruction(use_settings: bool = True) -> str:
+    """Get language instruction based on context.
+
+    Args:
+        use_settings: If True (default), use user's language preference from settings.
+                      CLI always uses explicit language (default English).
+                      If False, use "match question language" behavior (MCP mode).
 
     Returns:
-        Instruction string for prompt - either match question language
-        or use configured default language. Headers always in English.
+        Instruction string for prompt. Headers always in English.
     """
-    settings = get_settings()
-    if settings.default_language:
+    if not use_settings:
+        # MCP mode: match question language (standalone without CLI settings)
         return (
-            f"LANGUAGE: Respond in {settings.default_language}. "
+            "LANGUAGE: Respond in the same language as the question. "
             "IMPORTANT: Always use ENGLISH for section headers and labels "
             "(POSITION:, CONFIDENCE:, CONSENSUS:, AGREEMENTS:, etc.). "
             "Only the content/analysis should be in the target language."
         )
+
+    # CLI mode: ALWAYS explicit language (default English)
+    language = get_response_language()  # Returns "en" if not set
+    lang_name = LANGUAGE_NAMES.get(language, "English")
+
     return (
-        "LANGUAGE: Respond in the same language as the question. "
+        f"LANGUAGE: You MUST respond in {lang_name}. "
         "IMPORTANT: Always use ENGLISH for section headers and labels "
         "(POSITION:, CONFIDENCE:, CONSENSUS:, AGREEMENTS:, etc.). "
-        "Only the content/analysis should be in the target language."
+        f"Only the content/analysis should be in {lang_name}."
     )
 
 
@@ -101,7 +120,8 @@ AGREEMENTS: [specific points, reference which model]
 DISAGREEMENTS: [specific weaknesses]
 MISSING: [what no one addressed]
 
-Be genuinely critical. Do NOT just agree with everything."""
+Be genuinely critical. Both agreement AND disagreement are valid -
+honest critique matters more than artificial balance. Do NOT just agree with everything."""
 
 
 # =============================================================================
@@ -322,6 +342,7 @@ def get_oxford_prompt(
     all_initial_answers: str,
     all_critiques: str,
     discussion_history: str,
+    use_settings: bool = True,
 ) -> str:
     """Get the appropriate Oxford debate prompt for the current round.
 
@@ -332,13 +353,14 @@ def get_oxford_prompt(
         all_initial_answers: Formatted initial answers
         all_critiques: Formatted critiques
         discussion_history: Discussion so far
+        use_settings: If True, use user's language preference from settings.
 
     Returns:
         Formatted prompt for this round
     """
     opposing_role = "AGAINST" if role == "FOR" else "FOR"
     base_args = {
-        "language_instruction": get_language_instruction(),
+        "language_instruction": get_language_instruction(use_settings),
         "num_participants": num_participants,
         "role": role,
         "opposing_role": opposing_role,
@@ -407,7 +429,7 @@ DISCUSSION SO FAR:
 YOU MUST:
 1. Answer the specific question asked - do not evade
 2. Provide evidence or reasoning to support your answer
-3. If you cannot defend a point, acknowledge the weakness honestly
+3. If you cannot defend a point, acknowledge it clearly - honest concession is more valuable than weak defense
 4. If the question reveals a flaw in your thinking, adapt your position
 
 IMPORTANT: Start your response directly with your answer. Do NOT include role prefixes like "[DEFENDER]" or your model name - the system handles attribution automatically.
@@ -448,6 +470,7 @@ def get_advocate_examiner_prompt(
     discussion_history: str,
     current_round: int = 1,
     total_rounds: int = 1,
+    use_settings: bool = True,
 ) -> str:
     """Get prompt for the devil's advocate examining a specific defender.
 
@@ -456,12 +479,13 @@ def get_advocate_examiner_prompt(
         discussion_history: Discussion so far
         current_round: Current examination round (1-indexed)
         total_rounds: Total number of examination rounds
+        use_settings: If True, use user's language preference from settings.
 
     Returns:
         Formatted prompt for cross-examination
     """
     return ADVOCATE_PROMPT_EXAMINER.format(
-        language_instruction=get_language_instruction(),
+        language_instruction=get_language_instruction(use_settings),
         target_name=target_name,
         discussion_history=discussion_history,
         current_round=current_round,
@@ -469,32 +493,34 @@ def get_advocate_examiner_prompt(
     )
 
 
-def get_advocate_examined_prompt(discussion_history: str) -> str:
+def get_advocate_examined_prompt(discussion_history: str, use_settings: bool = True) -> str:
     """Get prompt for a defender being cross-examined.
 
     Args:
         discussion_history: Discussion so far
+        use_settings: If True, use user's language preference from settings.
 
     Returns:
         Formatted prompt for the examined defender
     """
     return ADVOCATE_PROMPT_EXAMINED.format(
-        language_instruction=get_language_instruction(),
+        language_instruction=get_language_instruction(use_settings),
         discussion_history=discussion_history,
     )
 
 
-def get_advocate_verdict_prompt(discussion_history: str) -> str:
+def get_advocate_verdict_prompt(discussion_history: str, use_settings: bool = True) -> str:
     """Get prompt for the advocate's final verdict.
 
     Args:
         discussion_history: Full examination transcript
+        use_settings: If True, use user's language preference from settings.
 
     Returns:
         Formatted prompt for verdict
     """
     return ADVOCATE_PROMPT_VERDICT.format(
-        language_instruction=get_language_instruction(),
+        language_instruction=get_language_instruction(use_settings),
         discussion_history=discussion_history,
     )
 
@@ -582,6 +608,7 @@ def get_socratic_questioner_prompt(
     respondent_name: str,
     current_round: int = 1,
     total_rounds: int = 1,
+    use_settings: bool = True,
 ) -> str:
     """Get prompt for the Socratic questioner.
 
@@ -592,6 +619,7 @@ def get_socratic_questioner_prompt(
         respondent_name: Name of the model being questioned (thesis presenter)
         current_round: Current round number (1-indexed)
         total_rounds: Total number of rounds
+        use_settings: If True, use user's language preference from settings.
 
     Returns:
         Formatted prompt for questioner
@@ -599,7 +627,7 @@ def get_socratic_questioner_prompt(
     round_guidance = _get_socratic_round_guidance(current_round, total_rounds)
 
     return SOCRATIC_PROMPT_QUESTIONER.format(
-        language_instruction=get_language_instruction(),
+        language_instruction=get_language_instruction(use_settings),
         num_participants=num_participants,
         all_initial_answers=all_initial_answers,
         discussion_history=discussion_history,
@@ -617,6 +645,7 @@ def get_socratic_respondent_prompt(
     discussion_history: str,
     current_round: int = 1,
     total_rounds: int = 1,
+    use_settings: bool = True,
 ) -> str:
     """Get prompt for Socratic respondents.
 
@@ -627,6 +656,7 @@ def get_socratic_respondent_prompt(
         discussion_history: Discussion so far
         current_round: Current round number (1-indexed)
         total_rounds: Total number of rounds
+        use_settings: If True, use user's language preference from settings.
 
     Returns:
         Formatted prompt for respondent
@@ -634,7 +664,7 @@ def get_socratic_respondent_prompt(
     round_guidance = _get_socratic_round_guidance(current_round, total_rounds)
 
     return SOCRATIC_PROMPT_RESPONDENT.format(
-        language_instruction=get_language_instruction(),
+        language_instruction=get_language_instruction(use_settings),
         num_participants=num_participants,
         all_initial_answers=all_initial_answers,
         question=question,
@@ -673,6 +703,7 @@ def get_standard_discussion_prompt(
     current_turn: int = 1,
     total_turns: int = 1,
     discussion_history: str = "",
+    use_settings: bool = True,
 ) -> str:
     """Get standard discussion prompt (Phase 3).
 
@@ -684,6 +715,7 @@ def get_standard_discussion_prompt(
         current_turn: Current turn number (1-indexed)
         total_turns: Total number of turns
         discussion_history: Previous discussion messages
+        use_settings: If True, use user's language preference from settings.
 
     Returns:
         Formatted standard discussion prompt
@@ -695,7 +727,7 @@ def get_standard_discussion_prompt(
         discussion_history_section = f"DISCUSSION SO FAR:\n{discussion_history}"
 
     return DISCUSSION_PROMPT_STANDARD.format(
-        language_instruction=get_language_instruction(),
+        language_instruction=get_language_instruction(use_settings),
         num_participants=num_participants,
         your_initial_answer=your_initial_answer,
         all_initial_answers=all_initial_answers,
@@ -720,7 +752,12 @@ ORIGINAL QUESTION:
 DISCUSSION SUMMARY:
 {discussion_summary}
 
-State YOUR final position, incorporating what you learned from the discussion.
+Reflect on the discussion. State your final position.
+
+If your position evolved, explain HOW and WHY it changed - what argument or evidence was compelling?
+If you maintain your original position, explain why the counter-arguments were insufficient.
+
+Both outcomes are valid - honest reflection matters more than forced evolution.
 
 IMPORTANT:
 - Include specific thresholds, frameworks, or conditions that emerged from the discussion
@@ -729,7 +766,7 @@ IMPORTANT:
 - Do NOT end with "let me know if you want more details"
 
 Format EXACTLY as:
-POSITION: [your refined final answer, incorporating discussion insights]
+POSITION: [your final answer - whether evolved or maintained, with reasoning]
 CONFIDENCE: [HIGH/MEDIUM/LOW]
 
 Where:
@@ -777,10 +814,13 @@ Include concrete numbers, examples, or criteria where relevant]
 
 DIFFERENCES: [Notable disagreements, or "None - strong consensus"]
 
+EVOLUTION: [Brief summary of how positions developed during the discussion. Did models converge from different starting points? Did any models explicitly change their position and why? Did models maintain their positions against counter-arguments? Base this ONLY on what models explicitly stated - do not infer or fabricate. 2-3 sentences max.]
+
 QUALITY REQUIREMENTS:
 - Bottom Line: Direct and decisive, not wishy-washy
-- Key Insight: Something they'll remember and quote
+- Key Insight: The most robust or actionable perspective. Do NOT claim what "a single AI would miss" - you cannot observe that counterfactual.
 - The Answer: Specific and actionable, not generic advice
+- Evolution: Report ONLY what models explicitly stated about their position changes. If positions don't mention evolution, say "Evolution not explicitly stated in final positions."
 - If the question involves communication/negotiation, include a sample script or response they can adapt
 
 Consensus guidelines:
@@ -802,17 +842,18 @@ def _make_valid_identifier(s: str) -> str:
     return result
 
 
-def get_phase1_prompt(num_participants: int) -> str:
+def get_phase1_prompt(num_participants: int, use_settings: bool = True) -> str:
     """Get the Phase 1 (independent answer) prompt.
 
     Args:
         num_participants: Number of participants in the discussion.
+        use_settings: If True, use user's language preference from settings.
 
     Returns:
         Formatted Phase 1 system prompt.
     """
     return PHASE1_PROMPT.format(
-        language_instruction=get_language_instruction(),
+        language_instruction=get_language_instruction(use_settings),
         num_participants=num_participants,
         markdown_instruction=MARKDOWN_INSTRUCTION,
     )
@@ -822,6 +863,7 @@ def get_critique_prompt(
     num_participants: int,
     your_initial_answer: str,
     all_initial_answers: str,
+    use_settings: bool = True,
 ) -> str:
     """Get the critique prompt (Phase 2 in new system).
 
@@ -829,30 +871,32 @@ def get_critique_prompt(
         num_participants: Number of participants.
         your_initial_answer: This agent's Phase 1 answer.
         all_initial_answers: Formatted string of all initial answers.
+        use_settings: If True, use user's language preference from settings.
 
     Returns:
         Formatted critique prompt.
     """
     return CRITIQUE_PROMPT.format(
-        language_instruction=get_language_instruction(),
+        language_instruction=get_language_instruction(use_settings),
         num_participants=num_participants,
         your_initial_answer=your_initial_answer,
         all_initial_answers=all_initial_answers,
     )
 
 
-def get_final_position_prompt(original_question: str, discussion_summary: str = "") -> str:
+def get_final_position_prompt(original_question: str, discussion_summary: str = "", use_settings: bool = True) -> str:
     """Get the final position prompt (Phase 4).
 
     Args:
         original_question: The original question being discussed.
         discussion_summary: Summary of Phase 3 discussion to provide context.
+        use_settings: If True, use user's language preference from settings.
 
     Returns:
         Formatted final position prompt.
     """
     return FINAL_POSITION_PROMPT.format(
-        language_instruction=get_language_instruction(),
+        language_instruction=get_language_instruction(use_settings),
         original_question=original_question,
         discussion_summary=discussion_summary if discussion_summary else "[No discussion summary available]",
     )
@@ -862,6 +906,7 @@ def get_synthesis_prompt(
     original_question: str,
     num_participants: int,
     all_positions: str,
+    use_settings: bool = True,
 ) -> str:
     """Get the synthesis prompt (Phase 5).
 
@@ -869,12 +914,13 @@ def get_synthesis_prompt(
         original_question: The original question being discussed.
         num_participants: Number of participants.
         all_positions: Formatted string of all final positions.
+        use_settings: If True, use user's language preference from settings.
 
     Returns:
         Formatted synthesis prompt.
     """
     return SYNTHESIS_PROMPT.format(
-        language_instruction=get_language_instruction(),
+        language_instruction=get_language_instruction(use_settings),
         original_question=original_question,
         num_participants=num_participants,
         all_positions=all_positions,
@@ -990,10 +1036,10 @@ KEY FACTORS: [Shared assumptions and compelling reasoning]
 OUTLIER PERSPECTIVES: [Dissenting views worth noting, or "None - strong convergence"]"""
 
 
-def get_delphi_round1_prompt(num_participants: int, question: str) -> str:
+def get_delphi_round1_prompt(num_participants: int, question: str, use_settings: bool = True) -> str:
     """Get Delphi Round 1 prompt for independent estimates."""
     return DELPHI_PROMPT_ROUND1.format(
-        language_instruction=get_language_instruction(),
+        language_instruction=get_language_instruction(use_settings),
         num_participants=num_participants,
         question=question,
     )
@@ -1005,10 +1051,11 @@ def get_delphi_revision_prompt(
     your_previous_estimate: str,
     group_estimates: str,
     group_statistics: str,
+    use_settings: bool = True,
 ) -> str:
     """Get Delphi revision prompt for subsequent rounds."""
     return DELPHI_PROMPT_REVISION.format(
-        language_instruction=get_language_instruction(),
+        language_instruction=get_language_instruction(use_settings),
         num_participants=num_participants,
         round_number=round_number,
         previous_round=round_number - 1,
@@ -1023,10 +1070,11 @@ def get_delphi_synthesis_prompt(
     num_participants: int,
     final_estimates: str,
     estimate_history: str,
+    use_settings: bool = True,
 ) -> str:
     """Get Delphi synthesis prompt for final aggregation."""
     return DELPHI_PROMPT_SYNTHESIS.format(
-        language_instruction=get_language_instruction(),
+        language_instruction=get_language_instruction(use_settings),
         question=question,
         num_participants=num_participants,
         final_estimates=final_estimates,
@@ -1139,28 +1187,28 @@ TOP PICK #3:
 Justify your selections. Focus on ideas that are NOVEL + ACTIONABLE."""
 
 
-def get_brainstorm_diverge_prompt(num_participants: int, question: str) -> str:
+def get_brainstorm_diverge_prompt(num_participants: int, question: str, use_settings: bool = True) -> str:
     """Get Brainstorm Phase 1 (Diverge) prompt."""
     return BRAINSTORM_PROMPT_DIVERGE.format(
-        language_instruction=get_language_instruction(),
+        language_instruction=get_language_instruction(use_settings),
         num_participants=num_participants,
         question=question,
     )
 
 
-def get_brainstorm_build_prompt(num_participants: int, all_ideas: str) -> str:
+def get_brainstorm_build_prompt(num_participants: int, all_ideas: str, use_settings: bool = True) -> str:
     """Get Brainstorm Phase 2 (Build) prompt."""
     return BRAINSTORM_PROMPT_BUILD.format(
-        language_instruction=get_language_instruction(),
+        language_instruction=get_language_instruction(use_settings),
         num_participants=num_participants,
         all_ideas=all_ideas,
     )
 
 
-def get_brainstorm_converge_prompt(num_participants: int, all_ideas_and_builds: str) -> str:
+def get_brainstorm_converge_prompt(num_participants: int, all_ideas_and_builds: str, use_settings: bool = True) -> str:
     """Get Brainstorm Phase 3 (Converge) prompt."""
     return BRAINSTORM_PROMPT_CONVERGE.format(
-        language_instruction=get_language_instruction(),
+        language_instruction=get_language_instruction(use_settings),
         num_participants=num_participants,
         all_ideas_and_builds=all_ideas_and_builds,
     )
@@ -1201,10 +1249,11 @@ def get_brainstorm_synthesis_prompt(
     question: str,
     num_participants: int,
     all_selections: str,
+    use_settings: bool = True,
 ) -> str:
     """Get Brainstorm synthesis prompt."""
     return BRAINSTORM_SYNTHESIS_PROMPT.format(
-        language_instruction=get_language_instruction(),
+        language_instruction=get_language_instruction(use_settings),
         question=question,
         num_participants=num_participants,
         all_selections=all_selections,
@@ -1345,9 +1394,10 @@ YOUR TASK - Produce a RECOMMENDATION:
    - Average the scores from all evaluators
    - Identify which alternative "wins" on raw totals
 
-2. AGREEMENT ASSESSMENT
-   - Do evaluators agree on the recommendation? (YES/NO)
-   - Where do they disagree most?
+2. EVALUATOR ALIGNMENT
+   - Do all evaluators recommend the same alternative? (YES/NO/MIXED)
+   - Where did scores diverge most significantly?
+   - Did any evaluator's reasoning highlight factors others missed?
 
 3. TRADEOFF ANALYSIS
    - What is the key tradeoff between the top options?
@@ -1359,13 +1409,13 @@ YOUR TASK - Produce a RECOMMENDATION:
    - Note important caveats
 
 FORMAT:
-AGREEMENT: [YES - all agree / NO - split decision]
+ALIGNMENT: [YES - all agree / NO - split decision / MIXED - agree on top but differ on reasoning]
 RECOMMENDATION: [Alternative name]
 
 AGGREGATED SCORES:
-| Alternative | Average Score | Evaluator Agreement |
-|-------------|--------------|---------------------|
-| [Alt A] | [X.X] | [# of evaluators who ranked it first] |
+| Alternative | Average Score | Evaluators Who Ranked First |
+|-------------|--------------|----------------------------|
+| [Alt A] | [X.X] | [# and which models] |
 | [Alt B] | [X.X] | [#] |
 ...
 
@@ -1379,19 +1429,19 @@ WHEN TO CHOOSE DIFFERENTLY:
 [Conditions under which another alternative would be better]"""
 
 
-def get_tradeoff_frame_prompt(num_participants: int, question: str) -> str:
+def get_tradeoff_frame_prompt(num_participants: int, question: str, use_settings: bool = True) -> str:
     """Get Tradeoff Phase 1 (Frame) prompt."""
     return TRADEOFF_PROMPT_FRAME.format(
-        language_instruction=get_language_instruction(),
+        language_instruction=get_language_instruction(use_settings),
         num_participants=num_participants,
         question=question,
     )
 
 
-def get_tradeoff_criteria_prompt(num_participants: int, alternatives: str) -> str:
+def get_tradeoff_criteria_prompt(num_participants: int, alternatives: str, use_settings: bool = True) -> str:
     """Get Tradeoff Phase 2 (Criteria) prompt."""
     return TRADEOFF_PROMPT_CRITERIA.format(
-        language_instruction=get_language_instruction(),
+        language_instruction=get_language_instruction(use_settings),
         num_participants=num_participants,
         alternatives=alternatives,
     )
@@ -1402,13 +1452,14 @@ def get_tradeoff_evaluate_prompt(
     alternatives: str,
     criteria: str,
     alternative_names: list[str],
+    use_settings: bool = True,
 ) -> str:
     """Get Tradeoff Phase 3 (Evaluate) prompt."""
     alternative_headers = " | ".join(alternative_names)
     header_dashes = " | ".join(["---"] * len(alternative_names))
 
     return TRADEOFF_PROMPT_EVALUATE.format(
-        language_instruction=get_language_instruction(),
+        language_instruction=get_language_instruction(use_settings),
         num_participants=num_participants,
         alternatives=alternatives,
         criteria=criteria,
@@ -1423,10 +1474,11 @@ def get_tradeoff_decide_prompt(
     alternatives: str,
     criteria: str,
     all_evaluations: str,
+    use_settings: bool = True,
 ) -> str:
     """Get Tradeoff Phase 4 (Decide) synthesis prompt."""
     return TRADEOFF_PROMPT_DECIDE.format(
-        language_instruction=get_language_instruction(),
+        language_instruction=get_language_instruction(use_settings),
         question=question,
         num_participants=num_participants,
         alternatives=alternatives,
@@ -1502,9 +1554,9 @@ RULES:
 Respond with ONLY the JSON, no other text."""
 
 
-def get_method_advisor_prompt(question: str) -> str:
+def get_method_advisor_prompt(question: str, use_settings: bool = True) -> str:
     """Get prompt for method advisor to analyze a question."""
     return METHOD_ADVISOR_PROMPT.format(
-        language_instruction=get_language_instruction(),
+        language_instruction=get_language_instruction(use_settings),
         question=question
     )

@@ -117,6 +117,7 @@ class FourPhaseConsensusTeam:
         synthesizer_override: str | None = None,
         method_override: str | None = None,
         role_assignments: dict[str, list[str]] | None = None,
+        use_language_settings: bool = True,
     ):
         """Initialize the four-phase consensus team.
 
@@ -133,11 +134,15 @@ class FourPhaseConsensusTeam:
                 "delphi", "brainstorm", "tradeoff", or None.
             role_assignments: Optional role assignments for methods like Oxford.
                 Dict mapping role names to lists of model IDs.
+            use_language_settings: If True (default), use user's language preference
+                from settings. If False, always use "match question language" behavior.
+                MCP server passes False to work standalone without CLI settings.
         """
         self.model_ids = model_ids
         self.synthesizer_override = synthesizer_override
         self.method_override = method_override
         self.role_assignments = role_assignments
+        self.use_language_settings = use_language_settings
 
         # Calculate max turns - only Standard uses config, others have fixed structure
         if max_discussion_turns is not None:
@@ -194,6 +199,7 @@ class FourPhaseConsensusTeam:
             "max_discussion_turns": self.max_discussion_turns,
             "synthesizer_override": self.synthesizer_override,
             "role_assignments": self.role_assignments,
+            "use_language_settings": self.use_language_settings,
         }
 
         return method_class(**kwargs)

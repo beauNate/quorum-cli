@@ -51,7 +51,7 @@ class AdvocateMethod(BaseMethodOrchestrator):
             advocate_model = self.model_ids[-1]
 
         defenders = [m for m in self.model_ids if m != advocate_model]
-        language_inst = get_language_instruction()
+        language_inst = get_language_instruction(self.use_language_settings)
 
         # === PHASE 1: Initial Positions ===
         yield self._create_phase_marker(1)
@@ -104,6 +104,7 @@ Be clear and direct - these claims will be rigorously examined."""
                 discussion_history="\n\n".join(discussion_history),
                 current_round=current_round,
                 total_rounds=total_rounds,
+                use_settings=self.use_language_settings,
             )
 
             examination = await self._get_model_response(
@@ -129,6 +130,7 @@ Be clear and direct - these claims will be rigorously examined."""
 
             examined_prompt = get_advocate_examined_prompt(
                 discussion_history="\n\n".join(discussion_history),
+                use_settings=self.use_language_settings,
             )
 
             response = await self._get_model_response(
@@ -151,6 +153,7 @@ Be clear and direct - these claims will be rigorously examined."""
 
         verdict_prompt = get_advocate_verdict_prompt(
             discussion_history="\n\n".join(discussion_history),
+            use_settings=self.use_language_settings,
         )
 
         verdict = await self._get_model_response(

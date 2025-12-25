@@ -20,6 +20,7 @@ import type {
   SynthesisEvent,
 } from "../ipc/protocol.js";
 import type { ConfidenceLevel } from "../types/protocol-values.js";
+import type { SupportedLanguage } from "../i18n/index.js";
 
 // ============================================================================
 // Constants
@@ -119,6 +120,9 @@ interface StoreState {
   backendError: string | null;
   resumeBackend: (() => Promise<void>) | null;
 
+  // Language
+  responseLanguage: SupportedLanguage;
+
   // UI Modals
   showModels: boolean;
   showMethods: boolean;
@@ -128,6 +132,7 @@ interface StoreState {
   showTeamPreview: boolean;
   showExportSelector: boolean;
   showAdvisor: boolean;
+  showLanguageSelector: boolean;
 
   // Actions
   setViewMode: (mode: ViewMode) => void;
@@ -166,6 +171,9 @@ interface StoreState {
   setResumeBackend: (fn: (() => Promise<void>) | null) => void;
   clearMessages: () => void;
   reset: () => void;
+  // Language actions
+  setResponseLanguage: (lang: SupportedLanguage) => void;
+
   // Modal actions
   setShowModels: (show: boolean) => void;
   setShowMethods: (show: boolean) => void;
@@ -175,6 +183,7 @@ interface StoreState {
   setShowTeamPreview: (show: boolean) => void;
   setShowExportSelector: (show: boolean) => void;
   setShowAdvisor: (show: boolean) => void;
+  setShowLanguageSelector: (show: boolean) => void;
   softReload: () => void;
 }
 
@@ -212,6 +221,9 @@ const initialState = {
   backendReady: false,
   backendError: null,
   resumeBackend: null,
+  // Language
+  responseLanguage: "en" as SupportedLanguage,
+
   // UI Modals
   showModels: false,
   showMethods: false,
@@ -221,6 +233,7 @@ const initialState = {
   showTeamPreview: false,
   showExportSelector: false,
   showAdvisor: false,
+  showLanguageSelector: false,
 };
 
 // ============================================================================
@@ -432,6 +445,9 @@ export const useStore = create<StoreState>()(
 
     reset: () => set(() => initialState),
 
+    // Language actions
+    setResponseLanguage: (lang) => set((state) => { state.responseLanguage = lang; }),
+
     // Modal actions
     setShowModels: (show) => set((state) => { state.showModels = show; }),
     setShowMethods: (show) => set((state) => { state.showMethods = show; }),
@@ -441,6 +457,7 @@ export const useStore = create<StoreState>()(
     setShowTeamPreview: (show) => set((state) => { state.showTeamPreview = show; }),
     setShowExportSelector: (show) => set((state) => { state.showExportSelector = show; }),
     setShowAdvisor: (show) => set((state) => { state.showAdvisor = show; }),
+    setShowLanguageSelector: (show) => set((state) => { state.showLanguageSelector = show; }),
 
     // Soft reload - clears screen and resets UI state
     softReload: () => {
@@ -476,6 +493,7 @@ export const useStore = create<StoreState>()(
         state.showTeamPreview = false;
         state.showExportSelector = false;
         state.showAdvisor = false;
+        state.showLanguageSelector = false;
       });
     },
   }))

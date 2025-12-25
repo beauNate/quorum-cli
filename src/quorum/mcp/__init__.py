@@ -292,6 +292,7 @@ async def _handle_discuss(args: dict[str, Any]) -> list[types.TextContent]:
         team = FourPhaseConsensusTeam(
             model_ids=model_ids,
             method_override=method,
+            use_language_settings=False,
         )
 
         async for msg in team.run_stream(full_question):

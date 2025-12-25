@@ -143,7 +143,7 @@ class StandardMethod(BaseMethodOrchestrator):
         (agent_name, content) tuples for results.
         """
         num_participants = len(self.model_ids)
-        phase1_prompt = get_phase1_prompt(num_participants)
+        phase1_prompt = get_phase1_prompt(num_participants, use_settings=self.use_language_settings)
 
         async def get_answer(model_id: str) -> tuple[str, str, str]:
             """Returns (model_id, agent_name, content).
@@ -238,6 +238,7 @@ class StandardMethod(BaseMethodOrchestrator):
                 num_participants=num_participants,
                 your_initial_answer=own_answer,
                 all_initial_answers=all_answers,
+                use_settings=self.use_language_settings,
             )
 
             try:
@@ -340,6 +341,7 @@ class StandardMethod(BaseMethodOrchestrator):
                 current_turn=turn + 1,
                 total_turns=total_turns,
                 discussion_history="\n\n".join(discussion_history),
+                use_settings=self.use_language_settings,
             )
 
             user_msg = f"Question: {task}\n\nContribute to the discussion."
@@ -359,7 +361,7 @@ class StandardMethod(BaseMethodOrchestrator):
         """Phase 4: Get final positions with confidence from all models."""
         # Build discussion summary from Phase 3
         discussion_summary = "\n\n".join(self._discussion_messages) if self._discussion_messages else ""
-        final_prompt = get_final_position_prompt(task, discussion_summary)
+        final_prompt = get_final_position_prompt(task, discussion_summary, use_settings=self.use_language_settings)
 
         async def get_final_position(model_id: str) -> FinalPosition:
             try:
@@ -438,6 +440,7 @@ class StandardMethod(BaseMethodOrchestrator):
             original_question=task,
             num_participants=num_participants,
             all_positions=all_positions,
+            use_settings=self.use_language_settings,
         )
 
         synthesizer_model = self._get_synthesizer_model()

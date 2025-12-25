@@ -60,6 +60,11 @@ export const fr: Translations = {
   "selector.synthesizer.title": "Sélectionner le synthétiseur",
   "selector.synthesizer.navigation": "↑↓ Naviguer • Entrée Sélectionner • Échap Fermer",
 
+  // Language Selector
+  "selector.language.title": "Langue des réponses",
+  "selector.language.navigation": "↑↓ Naviguer • Entrée Sélectionner • Échap Fermer",
+  "cmd.language": "Changer la langue des réponses",
+
   // Method Names and Descriptions
   "method.standard.name": "Standard",
   "method.standard.desc": "Discussion équilibrée orientée consensus",

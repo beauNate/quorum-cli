@@ -139,6 +139,7 @@ class BaseMethodOrchestrator(ABC):
         max_discussion_turns: int | None = None,
         synthesizer_override: str | None = None,
         role_assignments: dict[str, list[str]] | None = None,
+        use_language_settings: bool = True,
     ):
         """Initialize the orchestrator.
 
@@ -147,10 +148,13 @@ class BaseMethodOrchestrator(ABC):
             max_discussion_turns: Max turns for sequential phases.
             synthesizer_override: Override for synthesizer selection mode.
             role_assignments: Optional role assignments for methods.
+            use_language_settings: If True (default), use user's language preference
+                from settings. If False, always use "match question language" behavior.
         """
         self.model_ids = model_ids
         self.synthesizer_override = synthesizer_override
         self.role_assignments = role_assignments
+        self.use_language_settings = use_language_settings
 
         # Calculate max turns
         if max_discussion_turns is not None:

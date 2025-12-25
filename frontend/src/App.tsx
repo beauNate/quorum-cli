@@ -28,7 +28,7 @@ import { BackendClient } from "./ipc/index.js";
 import type { RoleAssignments } from "./ipc/protocol.js";
 import { useStore, type DiscussionMethod } from "./store/index.js";
 import type { ConfidenceLevel } from "./types/protocol-values.js";
-import { Input, Discussion, ModelSelector, MethodSelector, Status, Help, SynthesizerSelector, Header, TeamPreview, ExportSelector, MethodAdvisor } from "./components/index.js";
+import { Input, Discussion, ModelSelector, MethodSelector, Status, Help, SynthesizerSelector, Header, TeamPreview, ExportSelector, MethodAdvisor, LanguageSelector } from "./components/index.js";
 import { saveDiscussionToDir, exportSpecificLog, type ExportFormat } from "./utils/export.js";
 import { setLanguage, t } from "./i18n/index.js";
 
@@ -97,6 +97,7 @@ export function App() {
     showTeamPreview,
     showExportSelector,
     showAdvisor,
+    showLanguageSelector,
     setShowModels,
     setShowMethods,
     setShowHelp,
@@ -105,6 +106,9 @@ export function App() {
     setShowTeamPreview,
     setShowExportSelector,
     setShowAdvisor,
+    setShowLanguageSelector,
+    responseLanguage,
+    setResponseLanguage,
     softReload: storeSoftReload,
     currentDiscussionId,
     setCurrentDiscussionId,
@@ -142,7 +146,6 @@ export function App() {
         // Store config refs
         exportDirRef.current = config.export_dir;
         exportFormatRef.current = (config.export_format as ExportFormat) || "md";
-        setLanguage(config.default_language);
 
         // Restore user settings
         if (userSettings.selected_models?.length) {
@@ -156,6 +159,13 @@ export function App() {
         }
         if (userSettings.max_turns !== undefined) {
           setMaxTurns(userSettings.max_turns);
+        }
+        if (userSettings.response_language) {
+          setResponseLanguage(userSettings.response_language);
+          setLanguage(userSettings.response_language);
+        } else {
+          setResponseLanguage("en");
+          setLanguage("en");
         }
 
         // Signal launcher spinner to stop and wait briefly for it to clear
@@ -431,6 +441,11 @@ export function App() {
     backend.saveUserSettings({ max_turns: maxTurns });
   }, [maxTurns]);
 
+  useEffect(() => {
+    if (!settingsLoaded.current) return;
+    backend.saveUserSettings({ response_language: responseLanguage });
+  }, [responseLanguage]);
+
   // Start discussion with optional role assignments and method override
   const startDiscussionWithOptions = useCallback(
     async (question: string, roleAssignments?: RoleAssignments, methodOverride?: DiscussionMethod) => {
@@ -560,6 +575,11 @@ export function App() {
 
         case "synthesizer":
           setShowSynthesizer(true);
+          break;
+
+        case "language":
+        case "lang":
+          setShowLanguageSelector(true);
           break;
 
         case "export": {
@@ -773,6 +793,13 @@ export function App() {
       {showSynthesizer && (
         <Box marginBottom={1}>
           <SynthesizerSelector onSelect={softReload} />
+        </Box>
+      )}
+
+      {/* Language Selector Overlay */}
+      {showLanguageSelector && (
+        <Box marginBottom={1}>
+          <LanguageSelector onClose={() => setShowLanguageSelector(false)} />
         </Box>
       )}
 

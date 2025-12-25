@@ -63,6 +63,7 @@ class OxfordMethod(BaseMethodOrchestrator):
                 all_initial_answers="",
                 all_critiques="",
                 discussion_history="\n\n".join(discussion_history),
+                use_settings=self.use_language_settings,
             )
 
             user_msg = f"Motion: {task}\n\nDeliver your opening statement arguing {role} the motion."
@@ -86,6 +87,7 @@ class OxfordMethod(BaseMethodOrchestrator):
                 all_initial_answers="",
                 all_critiques="",
                 discussion_history="\n\n".join(discussion_history),
+                use_settings=self.use_language_settings,
             )
 
             user_msg = "Address the opposing side's arguments and defend your position."
@@ -118,6 +120,7 @@ class OxfordMethod(BaseMethodOrchestrator):
                 all_initial_answers="",
                 all_critiques="",
                 discussion_history="\n\n".join(discussion_history),
+                use_settings=self.use_language_settings,
             )
 
             user_msg = "Deliver your closing argument, summarizing your side's strongest points."
@@ -153,7 +156,7 @@ class OxfordMethod(BaseMethodOrchestrator):
     ) -> SynthesisResult:
         """Evaluate which side argued more effectively."""
         synthesizer_model = self._get_synthesizer_model()
-        language_inst = get_language_instruction()
+        language_inst = get_language_instruction(self.use_language_settings)
 
         judgement_prompt = f"""{language_inst}
 
@@ -171,7 +174,8 @@ Your task is to evaluate which side argued more effectively. Consider:
 Provide your judgement in this format:
 CONSENSUS: [FOR/AGAINST/PARTIAL] (which side was more convincing, or PARTIAL if too close to call)
 SYNTHESIS: [Your analysis of the key arguments and why one side was more effective]
-DIFFERENCES: [Note the main points of contention that remained unresolved]"""
+DIFFERENCES: [Note the main points of contention that remained unresolved]
+EVOLUTION: [How did arguments develop during the debate? Note any concessions made during rebuttals, arguments that gained or lost strength, or pivotal moments that shifted the debate dynamic.]"""
 
         try:
             client = await get_pooled_client(synthesizer_model)

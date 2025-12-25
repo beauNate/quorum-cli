@@ -5,7 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.1.5] - 2025-12-25
+
+### Added
+
+- **Language Selector** - Choose response language directly in the UI
+  - New dropdown in header: English, Swedish, German, French, Spanish, Italian
+  - Setting persisted across sessions
+  - MCP mode defaults to "match question language" for backwards compatibility
+
+- **EVOLUTION Section in Synthesis** - Shows how positions developed during discussion
+  - Summarizes convergence patterns and position changes
+  - Based only on what models explicitly stated (prevents fabrication)
+  - Makes Quorum's value visible to users who skip to the synthesis
+
+### Changed
+
+- **Phase 4 Honest Reflection** - Reduced sycophancy in final positions
+  - Prompt now asks models to explain WHY position evolved OR why they maintained it
+  - "Both outcomes are valid - honest reflection matters more than forced evolution"
+  - Prevents fabricated "learning" claims when original position was already correct
+
+- **Key Insight Quality** - Removed unverifiable counterfactual claims
+  - Changed from "Something they'll remember and quote"
+  - To "The most robust or actionable perspective"
+  - Added: "Do NOT claim what a single AI would miss - you cannot observe that"
+
+- **Genuine Debates** - Anti-sycophancy improvements across all methods
+  - Critique: Stronger language normalizing disagreement
+  - Oxford: EVOLUTION section in judgement showing how arguments developed
+  - Advocate: Explicit value of honest concession over weak defense
+  - Socratic: THESIS_EVOLUTION tracking concrete position changes
+  - Tradeoff: EVALUATOR_ALIGNMENT showing recommendation consensus
 
 ---
 
@@ -322,7 +353,11 @@ User cache (`~/.quorum/`):
 
 ---
 
-[Unreleased]: https://github.com/Detrol/quorum-cli/compare/v1.1.0...HEAD
+[1.1.5]: https://github.com/Detrol/quorum-cli/compare/v1.1.4...v1.1.5
+[1.1.4]: https://github.com/Detrol/quorum-cli/compare/v1.1.3...v1.1.4
+[1.1.3]: https://github.com/Detrol/quorum-cli/compare/v1.1.2...v1.1.3
+[1.1.2]: https://github.com/Detrol/quorum-cli/compare/v1.1.1...v1.1.2
+[1.1.1]: https://github.com/Detrol/quorum-cli/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/Detrol/quorum-cli/compare/v1.0.7...v1.1.0
 [1.0.7]: https://github.com/Detrol/quorum-cli/compare/v1.0.5...v1.0.7
 [1.0.5]: https://github.com/Detrol/quorum-cli/compare/v1.0.4...v1.0.5

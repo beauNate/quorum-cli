@@ -101,6 +101,7 @@ export interface UserSettings {
   discussion_method?: "standard" | "oxford" | "advocate" | "socratic" | "delphi" | "brainstorm" | "tradeoff";
   synthesizer_mode?: "first" | "random" | "rotate";
   max_turns?: number | null;
+  response_language?: "en" | "sv" | "de" | "fr" | "es" | "it";
 }
 
 export type RoleAssignments = Record<string, string[]>;
@@ -143,7 +144,6 @@ export interface AnalyzeQuestionResult {
 export interface GetConfigResult {
   rounds_per_agent: number;
   synthesizer_mode: string;
-  default_language: string | null;
   available_providers: string[];
   report_dir: string;
   export_dir: string | null;

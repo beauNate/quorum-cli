@@ -19,6 +19,7 @@ const getCommands = (): Command[] => [
   { name: "/models", description: t("cmd.models"), shortcut: "m" },
   { name: "/method", description: t("cmd.method") },
   { name: "/synthesizer", description: t("cmd.synthesizer") },
+  { name: "/language", description: t("cmd.language") },
   { name: "/status", description: t("cmd.status"), shortcut: "s" },
   { name: "/export", description: t("cmd.export"), hasParams: true },
   { name: "/clear", description: t("cmd.clear"), shortcut: "c" },

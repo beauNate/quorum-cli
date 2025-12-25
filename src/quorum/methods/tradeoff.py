@@ -100,7 +100,7 @@ class TradeoffMethod(BaseMethodOrchestrator):
     async def _run_tradeoff_frame(self, task: str) -> dict[str, str]:
         """Phase 1: All models define alternatives in parallel."""
         num_participants = len(self.model_ids)
-        prompt = get_tradeoff_frame_prompt(num_participants, task)
+        prompt = get_tradeoff_frame_prompt(num_participants, task, use_settings=self.use_language_settings)
         return await self._run_parallel_phase(
             prompt_builder=lambda _: prompt,
             user_message=task,
@@ -109,7 +109,7 @@ class TradeoffMethod(BaseMethodOrchestrator):
     async def _run_tradeoff_criteria(self, alternatives: str) -> dict[str, str]:
         """Phase 2: All models define criteria in parallel."""
         num_participants = len(self.model_ids)
-        prompt = get_tradeoff_criteria_prompt(num_participants, alternatives)
+        prompt = get_tradeoff_criteria_prompt(num_participants, alternatives, use_settings=self.use_language_settings)
         return await self._run_parallel_phase(
             prompt_builder=lambda _: prompt,
             user_message="Define evaluation criteria.",
@@ -121,7 +121,8 @@ class TradeoffMethod(BaseMethodOrchestrator):
         """Phase 3: All models evaluate alternatives in parallel."""
         num_participants = len(self.model_ids)
         prompt = get_tradeoff_evaluate_prompt(
-            num_participants, alternatives, criteria, alternative_names
+            num_participants, alternatives, criteria, alternative_names,
+            use_settings=self.use_language_settings,
         )
         return await self._run_parallel_phase(
             prompt_builder=lambda _: prompt,
@@ -186,6 +187,7 @@ class TradeoffMethod(BaseMethodOrchestrator):
             alternatives=alternatives,
             criteria=criteria,
             all_evaluations=all_evaluations,
+            use_settings=self.use_language_settings,
         )
 
         try:

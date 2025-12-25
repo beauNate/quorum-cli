@@ -59,6 +59,11 @@ export type TranslationKey =
   | "selector.synthesizer.title"
   | "selector.synthesizer.navigation"
 
+  // Language Selector
+  | "selector.language.title"
+  | "selector.language.navigation"
+  | "cmd.language"
+
   // Method Names
   | "method.standard.name"
   | "method.standard.desc"

@@ -656,7 +656,6 @@ class IPCHandler:
         return {
             "rounds_per_agent": settings.rounds_per_agent,
             "synthesizer_mode": settings.synthesizer_mode,
-            "default_language": settings.default_language,
             "available_providers": settings.available_providers,
             "report_dir": str(report_dir),
             "export_dir": str(export_dir) if export_dir else None,

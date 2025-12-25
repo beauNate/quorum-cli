@@ -57,7 +57,10 @@ class SocraticMethod(BaseMethodOrchestrator):
         yield self._create_phase_marker(1)
         yield ThinkingIndicator(model=thesis_presenter)
 
-        thesis_prompt = """You are beginning a Socratic dialogue. Like Socrates' interlocutors, you will present an initial thesis that will be examined through questioning.
+        language_inst = get_language_instruction(self.use_language_settings)
+        thesis_prompt = f"""{language_inst}
+
+You are beginning a Socratic dialogue. Like Socrates' interlocutors, you will present an initial thesis that will be examined through questioning.
 
 Present your initial position on the question. Be clear and definitive - this will be the starting point for critical examination.
 
@@ -91,6 +94,7 @@ Remember: In Socratic dialogue, initial positions are often refined or even over
                 respondent_name=self._display_name(respondent_model),
                 current_round=current_round,
                 total_rounds=total_rounds,
+                use_settings=self.use_language_settings,
             )
 
             question = await self._get_model_response(
@@ -114,6 +118,7 @@ Remember: In Socratic dialogue, initial positions are often refined or even over
                 discussion_history="\n\n".join(discussion_history),
                 current_round=current_round,
                 total_rounds=total_rounds,
+                use_settings=self.use_language_settings,
             )
 
             answer = await self._get_model_response(
@@ -132,7 +137,7 @@ Remember: In Socratic dialogue, initial positions are often refined or even over
 
         yield ThinkingIndicator(model=thesis_presenter)
 
-        language_inst = get_language_instruction()
+        language_inst = get_language_instruction(self.use_language_settings)
         aporia_prompt = f"""{language_inst}
 
 The Socratic examination of your thesis is complete.
@@ -200,7 +205,7 @@ Do NOT state your own position on the question. Your role was to examine, not to
     ) -> SynthesisResult:
         """Synthesize the outcomes of the Socratic dialogue."""
         synthesizer_model = self._get_synthesizer_model()
-        language_inst = get_language_instruction()
+        language_inst = get_language_instruction(self.use_language_settings)
 
         synthesis_prompt = f"""{language_inst}
 
@@ -217,7 +222,8 @@ Analyze what was discovered through this examination:
 Provide your synthesis in this format:
 APORIA_REACHED: [YES/PARTIAL/NO] (did the examination reveal gaps in understanding?)
 SYNTHESIS: [What the Socratic examination revealed - focus on the journey of inquiry, not conclusions]
-OPEN_QUESTIONS: [Questions that remain unresolved - this is valuable in Socratic dialogue]"""
+OPEN_QUESTIONS: [Questions that remain unresolved - this is valuable in Socratic dialogue]
+THESIS_EVOLUTION: [How did the respondent's position concretely change? Note specific concessions, refinements, or moments where assumptions were exposed and acknowledged. If no change occurred, note what arguments the respondent maintained and why.]"""
 
         try:
             client = await get_pooled_client(synthesizer_model)

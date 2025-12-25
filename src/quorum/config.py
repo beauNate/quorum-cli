@@ -100,12 +100,23 @@ def get_user_settings() -> dict:
         return {}
 
 
+def get_response_language() -> str:
+    """Get the response language from user settings.
+
+    Returns:
+        Language code (en, sv, de, fr, es, it). Defaults to 'en'.
+    """
+    settings = get_user_settings()
+    return settings.get("response_language", "en")
+
+
 # Allowed user settings keys with their expected types and validators
 ALLOWED_USER_SETTINGS: dict[str, tuple[type, callable | None]] = {
     "selected_models": (list, lambda v: all(isinstance(m, str) for m in v)),
     "discussion_method": (str, lambda v: v in {"standard", "oxford", "advocate", "socratic", "delphi", "brainstorm", "tradeoff"}),
     "synthesizer_mode": (str, lambda v: v in {"first", "random", "rotate"}),
     "max_turns": (int, lambda v: 1 <= v <= 100),
+    "response_language": (str, lambda v: v in {"en", "sv", "de", "fr", "es", "it"}),
 }
 
 
@@ -277,9 +288,6 @@ class Settings(BaseSettings):
     default_max_turns: int = Field(default=20, ge=1, le=100)
 
     # === Quorum configuration ===
-
-    # Language: None = match question language, or force a specific language
-    default_language: str | None = Field(default=None, alias="QUORUM_DEFAULT_LANGUAGE")
 
     # === Standard method configuration ===
     # These settings ONLY apply to Standard method. Other methods (Oxford, Advocate,
